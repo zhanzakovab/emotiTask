@@ -35,8 +35,9 @@ class ChatServiceManager {
         // Option 3: From Keychain (recommended for production)
         // return KeychainManager.getAPIKey(for: "openai")
         
-        return nil  // 👈 PUT YOUR API KEY HERE: return "your-api-key-here"
-
+        // Option 4: Hardcoded for development (not recommended for production)
+        // return "your-api-key-here"  // 👈 PUT YOUR API KEY HERE
+        return nil
     }
     
     func setOpenAIAPIKey(_ apiKey: String) {

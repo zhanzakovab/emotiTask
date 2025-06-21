@@ -5,7 +5,7 @@ import SwiftUI
 
 protocol ChatServiceProtocol {
     func sendMessage(_ message: String) async throws -> String
-    func generateTaskSuggestions(for message: String, currentTasks: [EmotiTask.Task]) async throws -> [TodoSuggestion]
+    func generateTaskSuggestions(for message: String, currentTasks: [Task]) async throws -> [TodoSuggestion]
 }
 
 // MARK: - Dummy Chat Service (for now)
@@ -25,7 +25,7 @@ class DummyChatService: ChatServiceProtocol {
         return responses.randomElement() ?? "I'm here to help you navigate through this."
     }
     
-    func generateTaskSuggestions(for message: String, currentTasks: [EmotiTask.Task]) async throws -> [TodoSuggestion] {
+    func generateTaskSuggestions(for message: String, currentTasks: [Task]) async throws -> [TodoSuggestion] {
         // Simulate network delay
         try await _Concurrency.Task.sleep(nanoseconds: 1_000_000_000)
         
@@ -74,7 +74,7 @@ struct TodoSuggestion: Identifiable {
     let id = UUID()
     let message: String
     let actionType: SuggestionActionType
-    let taskId: UUID?
+    let taskId: String?
     
     enum SuggestionActionType {
         case rescheduleTask(to: Date)
@@ -239,7 +239,7 @@ class ChatSessionData: ObservableObject {
     }
     
     @MainActor
-    func generateSuggestions(for message: String, currentTasks: [EmotiTask.Task]) async -> [TodoSuggestion] {
+    func generateSuggestions(for message: String, currentTasks: [Task]) async -> [TodoSuggestion] {
         do {
             return try await chatService.generateTaskSuggestions(for: message, currentTasks: currentTasks)
         } catch {
