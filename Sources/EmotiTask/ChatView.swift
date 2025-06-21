@@ -26,49 +26,6 @@ struct ChatView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                // Header
-                VStack(spacing: 16) {
-                    // Character
-                    ZStack {
-                        Circle()
-                            .fill(Color.yellow.opacity(0.3))
-                            .frame(width: 60, height: 60)
-                        
-                        // Happy face
-                        VStack(spacing: 4) {
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(Color.black)
-                                    .frame(width: 4, height: 4)
-                                Circle()
-                                    .fill(Color.black)
-                                    .frame(width: 4, height: 4)
-                            }
-                            
-                            Path { path in
-                                path.addArc(center: CGPoint(x: 8, y: 3), 
-                                          radius: 6, 
-                                          startAngle: .degrees(0), 
-                                          endAngle: .degrees(180), 
-                                          clockwise: false)
-                            }
-                            .stroke(Color.black, lineWidth: 1)
-                            .frame(width: 16, height: 8)
-                        }
-                    }
-                    
-                    VStack(spacing: 4) {
-                        Text("EmotiTask Assistant")
-                            .font(.system(size: 18, weight: .semibold, design: .rounded))
-                            .foregroundColor(.primary)
-                        
-                        Text("Your personal productivity companion")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.top, 20)
-                .padding(.bottom, 10)
                 
                 // Messages
                 ScrollViewReader { proxy in
@@ -266,8 +223,7 @@ struct ChatView: View {
             toDoSession.addTask(selfCareTask)
             chatSession.addAIMessage("✅ I've added a mindful break to your schedule. Your wellbeing matters!")
         case .prioritizeTask:
-            if let taskId = suggestion.taskId {
-                // Logic to prioritize task (could modify priority or move to top)
+            if suggestion.taskId != nil {
                 chatSession.addAIMessage("✅ I've prioritized that task for you. You've got this!")
             }
         case .addBreak:

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @State private var selectedTab = 1 // Default to chat (center)
+    @State private var selectedTab = 1 // Default to chat
     
     var body: some View {
         ZStack {
@@ -14,6 +14,8 @@ struct MainTabView: View {
                     ChatView()
                 case 2:
                     TodoView()
+                case 3:
+                    CalendarView()
                 default:
                     ChatView()
                 }
@@ -67,6 +69,17 @@ struct FloatingTabBar: View {
                 action: {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         selectedTab = 2
+                    }
+                }
+            )
+            
+            // Calendar Tab
+            TabButton(
+                icon: "calendar.circle.fill",
+                isSelected: selectedTab == 3,
+                action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selectedTab = 3
                     }
                 }
             )
