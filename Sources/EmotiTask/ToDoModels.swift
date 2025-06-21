@@ -211,6 +211,10 @@ class ToDoSessionData: ObservableObject {
     @Published var userEmotionalState: String // From chat context
     @Published var selectedViewMode: TaskViewMode = .list
     @Published var selectedFilter: TaskFilter = .all
+    @Published var isLoading: Bool = false
+    @Published var lastError: String?
+    
+    private let taskService = TaskService.shared
     
     init() {
         self.tasks = []
@@ -309,9 +313,41 @@ class ToDoSessionData: ObservableObject {
     
     // MARK: - Task Methods
     func completeTask(_ taskId: UUID) {
+        // Update local state immediately for responsive UI
         if let index = tasks.firstIndex(where: { $0.id == taskId }) {
-            tasks[index].isCompleted = true
+            let newCompletionState = !tasks[index].isCompleted
+            tasks[index].isCompleted = newCompletionState
             updateGoalProgress(for: taskId)
+            
+            // Only sync with backend if enabled
+            guard TaskServiceConfig.isBackendEnabled else {
+                if TaskServiceConfig.isDebugEnabled {
+                    print("ℹ️ Backend disabled - task completion updated locally only")
+                }
+                return
+            }
+            
+            // Update backend in background
+            _Concurrency.Task {
+                do {
+                    try await taskService.updateTaskCompletion(taskId: taskId, isCompleted: newCompletionState)
+                    if TaskServiceConfig.isDebugEnabled {
+                        print("✅ Task completion updated on backend")
+                    }
+                } catch {
+                    // Revert local change if backend update fails
+                    await MainActor.run {
+                        if let index = tasks.firstIndex(where: { $0.id == taskId }) {
+                            tasks[index].isCompleted = !newCompletionState
+                            updateGoalProgress(for: taskId)
+                        }
+                        lastError = "Failed to update task: \(error.localizedDescription)"
+                    }
+                    if TaskServiceConfig.isDebugEnabled {
+                        print("❌ Failed to update task completion: \(error.localizedDescription)")
+                    }
+                }
+            }
         }
     }
     
@@ -322,11 +358,116 @@ class ToDoSessionData: ObservableObject {
     }
     
     func addTask(_ task: Task) {
+        // Add to local state immediately for responsive UI
         tasks.append(task)
+        
+        // Only sync with backend if enabled
+        guard TaskServiceConfig.isBackendEnabled else {
+            if TaskServiceConfig.isDebugEnabled {
+                print("ℹ️ Backend disabled - task added locally only: \(task.title)")
+            }
+            return
+        }
+        
+        isLoading = true
+        lastError = nil
+        
+        // Create on backend in background
+        _Concurrency.Task {
+            do {
+                let createdTask = try await taskService.createTask(task)
+                await MainActor.run {
+                    // Update the local task with backend ID/data if needed
+                    if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                        // Update with any backend-specific data
+                        isLoading = false
+                    }
+                    if TaskServiceConfig.isDebugEnabled {
+                        print("✅ Task created successfully on backend: \(createdTask.title)")
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    lastError = "Failed to sync task: \(error.localizedDescription)"
+                    isLoading = false
+                    if TaskServiceConfig.isDebugEnabled {
+                        print("❌ Failed to create task on backend: \(error.localizedDescription)")
+                    }
+                    // Task remains in local state for offline support
+                }
+            }
+        }
     }
     
     func deleteTask(_ taskId: UUID) {
+        // Remove from local state immediately for responsive UI
+        let removedTask = tasks.first { $0.id == taskId }
         tasks.removeAll { $0.id == taskId }
+        
+        // Only sync with backend if enabled
+        guard TaskServiceConfig.isBackendEnabled else {
+            if TaskServiceConfig.isDebugEnabled {
+                print("ℹ️ Backend disabled - task deleted locally only")
+            }
+            return
+        }
+        
+        // Delete from backend in background
+        _Concurrency.Task {
+            do {
+                try await taskService.deleteTask(taskId: taskId)
+                if TaskServiceConfig.isDebugEnabled {
+                    print("✅ Task deleted from backend")
+                }
+            } catch {
+                // Restore task if backend deletion fails
+                await MainActor.run {
+                    if let task = removedTask {
+                        tasks.append(task)
+                    }
+                    lastError = "Failed to delete task: \(error.localizedDescription)"
+                }
+                if TaskServiceConfig.isDebugEnabled {
+                    print("❌ Failed to delete task: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    // Load tasks from backend
+    func loadTasks() async {
+        // Only load from backend if enabled
+        guard TaskServiceConfig.isBackendEnabled else {
+            if TaskServiceConfig.isDebugEnabled {
+                print("ℹ️ Backend disabled - using local tasks only")
+            }
+            return
+        }
+        
+        await MainActor.run {
+            isLoading = true
+            lastError = nil
+        }
+        
+        do {
+            let backendTasks = try await taskService.getTasks()
+            
+            await MainActor.run {
+                tasks = backendTasks
+                isLoading = false
+                if TaskServiceConfig.isDebugEnabled {
+                    print("✅ Loaded \(backendTasks.count) tasks from backend")
+                }
+            }
+        } catch {
+            await MainActor.run {
+                lastError = "Failed to load tasks: \(error.localizedDescription)"
+                isLoading = false
+            }
+            if TaskServiceConfig.isDebugEnabled {
+                print("❌ Failed to load tasks: \(error.localizedDescription)")
+            }
+        }
     }
     
     private func updateGoalProgress(for taskId: UUID) {

@@ -148,6 +148,12 @@ struct TodoView: View {
         .sheet(isPresented: $showingAllTasks) {
             AllTasksView(sessionData: sessionData)
         }
+        .onAppear {
+            // Load tasks from backend when view appears
+            _Concurrency.Task {
+                await sessionData.loadTasks()
+            }
+        }
     }
     
     private func deleteProjects(at offsets: IndexSet) {
@@ -559,9 +565,10 @@ struct NewTaskView: View {
                             estimatedDuration: estimatedDuration,
                             projectId: projectId
                     )
-                    onSave(newTask)
-                    dismiss()
-                }
+                        
+                        onSave(newTask)
+                        dismiss()
+                    }
                 .disabled(title.isEmpty)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
