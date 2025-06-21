@@ -139,7 +139,7 @@ struct WelcomeView: View {
                 endPoint: .bottomTrailing
             )
         )
-        .fullScreenCover(isPresented: $showingOnboarding) {
+        .sheet(isPresented: $showingOnboarding) {
             OnboardingView()
         }
         .fullScreenCover(isPresented: $showingMainApp) {

@@ -1,0 +1,65 @@
+{
+  "": {
+    "swift-dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/master.swiftdeps"
+  },
+  "/Users/botakoz/Desktop/emotiTask/Sources/EmotiTask/ChatModels.swift": {
+    "dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ChatModels.d",
+    "object": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ChatModels.swift.o",
+    "swiftmodule": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ChatModels~partial.swiftmodule",
+    "swift-dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ChatModels.swiftdeps"
+  },
+  "/Users/botakoz/Desktop/emotiTask/Sources/EmotiTask/ChatView.swift": {
+    "dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ChatView.d",
+    "object": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ChatView.swift.o",
+    "swiftmodule": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ChatView~partial.swiftmodule",
+    "swift-dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ChatView.swiftdeps"
+  },
+  "/Users/botakoz/Desktop/emotiTask/Sources/EmotiTask/EmotiTaskApp.swift": {
+    "dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/EmotiTaskApp.d",
+    "object": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/EmotiTaskApp.swift.o",
+    "swiftmodule": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/EmotiTaskApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/EmotiTaskApp.swiftdeps"
+  },
+  "/Users/botakoz/Desktop/emotiTask/Sources/EmotiTask/MainTabView.swift": {
+    "dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/MainTabView.d",
+    "object": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/MainTabView.swift.o",
+    "swiftmodule": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/MainTabView~partial.swiftmodule",
+    "swift-dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/MainTabView.swiftdeps"
+  },
+  "/Users/botakoz/Desktop/emotiTask/Sources/EmotiTask/OnboardingView.swift": {
+    "dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/OnboardingView.d",
+    "object": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/OnboardingView.swift.o",
+    "swiftmodule": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/OnboardingView~partial.swiftmodule",
+    "swift-dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/OnboardingView.swiftdeps"
+  },
+  "/Users/botakoz/Desktop/emotiTask/Sources/EmotiTask/OnboardingViewModel.swift": {
+    "dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/OnboardingViewModel.d",
+    "object": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/OnboardingViewModel.swift.o",
+    "swiftmodule": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/OnboardingViewModel~partial.swiftmodule",
+    "swift-dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/OnboardingViewModel.swiftdeps"
+  },
+  "/Users/botakoz/Desktop/emotiTask/Sources/EmotiTask/ProfileView.swift": {
+    "dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ProfileView.d",
+    "object": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ProfileView.swift.o",
+    "swiftmodule": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ProfileView~partial.swiftmodule",
+    "swift-dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ProfileView.swiftdeps"
+  },
+  "/Users/botakoz/Desktop/emotiTask/Sources/EmotiTask/ToDoModels.swift": {
+    "dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ToDoModels.d",
+    "object": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ToDoModels.swift.o",
+    "swiftmodule": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ToDoModels~partial.swiftmodule",
+    "swift-dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/ToDoModels.swiftdeps"
+  },
+  "/Users/botakoz/Desktop/emotiTask/Sources/EmotiTask/TodoView.swift": {
+    "dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/TodoView.d",
+    "object": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/TodoView.swift.o",
+    "swiftmodule": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/TodoView~partial.swiftmodule",
+    "swift-dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/TodoView.swiftdeps"
+  },
+  "/Users/botakoz/Desktop/emotiTask/Sources/EmotiTask/WelcomeView.swift": {
+    "dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/WelcomeView.d",
+    "object": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/WelcomeView.swift.o",
+    "swiftmodule": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/WelcomeView~partial.swiftmodule",
+    "swift-dependencies": "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/WelcomeView.swiftdeps"
+  }
+}
