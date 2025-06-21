@@ -78,6 +78,7 @@ struct TodoView: View {
                                 }
                             )
                         }
+                        .onDelete(perform: deleteProjects)
                         
                         // Add Project Button
                         Button(action: { showingNewProject = true }) {
@@ -117,17 +118,17 @@ struct TodoView: View {
                             .font(.title3)
                             .foregroundColor(.black.opacity(0.8))
                     }
-                }
             }
-            .background(
-                LinearGradient(
+        }
+        .background(
+            LinearGradient(
                     colors: [
                         Color(red: 1.0, green: 0.9, blue: 0.8),
                         Color(red: 1.0, green: 0.8, blue: 0.7)
                     ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
                 .ignoresSafeArea()
             )
         }
@@ -146,6 +147,13 @@ struct TodoView: View {
         }
         .sheet(isPresented: $showingAllTasks) {
             AllTasksView(sessionData: sessionData)
+        }
+    }
+    
+    private func deleteProjects(at offsets: IndexSet) {
+        for index in offsets {
+            let project = sessionData.projects[index]
+            sessionData.deleteProject(project.id)
         }
     }
 }
@@ -169,13 +177,13 @@ struct OverviewCard: View {
                     
                     Spacer()
                     
-                    Text("\(count)")
+            Text("\(count)")
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
                 }
-                
-                Text(title)
+            
+            Text(title)
                     .font(.body)
                     .foregroundColor(.black.opacity(0.7))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -214,7 +222,7 @@ struct ProjectListCard: View {
                     
                     if !project.description.isEmpty {
                         Text(project.description)
-                            .font(.caption)
+                .font(.caption)
                             .foregroundColor(.black.opacity(0.6))
                             .lineLimit(1)
                     }
@@ -224,7 +232,7 @@ struct ProjectListCard: View {
                 
                 Text("\(taskCount)")
                     .font(.body)
-                    .fontWeight(.medium)
+                .fontWeight(.medium)
                     .foregroundColor(.black.opacity(0.7))
                 
                 Image(systemName: "chevron.right")
@@ -268,7 +276,7 @@ struct TaskCard: View {
                 HStack(spacing: 8) {
                     if let tag = task.emotionalTag {
                         Text(tag.rawValue)
-                            .font(.caption)
+                    .font(.caption)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(tag.color.opacity(0.2))
@@ -461,23 +469,23 @@ struct NewTaskView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Task Title")
-                            .font(.headline)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Task Title")
+                        .font(.headline)
                             .foregroundColor(.black)
                         TextField("What needs to be done?", text: $title)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
                         Text("Notes (Optional)")
-                            .font(.headline)
+                        .font(.headline)
                             .foregroundColor(.black)
                         TextField("Any additional details...", text: $notes)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
                         Text("When")
                             .font(.headline)
                             .foregroundColor(.black)
@@ -499,7 +507,7 @@ struct NewTaskView: View {
                     
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Tag (Optional)")
-                            .font(.headline)
+                        .font(.headline)
                             .foregroundColor(.black)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
@@ -534,29 +542,29 @@ struct NewTaskView: View {
                         HStack {
                             Text("\(estimatedDuration) minutes")
                                 .foregroundColor(.black.opacity(0.7))
-                            Spacer()
+                Spacer()
                             Stepper("", value: $estimatedDuration, in: 5...480, step: 5)
                         }
                     }
                     
                     Spacer(minLength: 40)
-                    
+                
                     Button("Create Task") {
                         let newTask = Task(
-                            title: title,
+                        title: title,
                             emotionalTag: emotionalTag,
                             scheduledDate: scheduledDate,
                             notes: notes,
                             priority: priority,
                             estimatedDuration: estimatedDuration,
                             projectId: projectId
-                        )
-                        onSave(newTask)
-                        dismiss()
-                    }
-                    .disabled(title.isEmpty)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
+                    )
+                    onSave(newTask)
+                    dismiss()
+                }
+                .disabled(title.isEmpty)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
                     .frame(height: 56)
                     .background(title.isEmpty ? Color.gray : Color.black.opacity(0.8))
                     .cornerRadius(28)
@@ -686,6 +694,7 @@ struct ProjectDetailView: View {
                             ForEach(projectTasks) { task in
                                 ProjectTaskCard(task: task, sessionData: sessionData, projectColor: project.color)
                             }
+                            .onDelete(perform: deleteProjectTasks)
                         }
                         .padding(.horizontal, 16)
                     }
@@ -727,6 +736,13 @@ struct ProjectDetailView: View {
             NewTaskView(projectId: project.id) { task in
                 sessionData.addTask(task)
             }
+        }
+    }
+    
+    private func deleteProjectTasks(at offsets: IndexSet) {
+        for index in offsets {
+            let task = projectTasks[index]
+            sessionData.deleteTask(task.id)
         }
     }
 }
@@ -910,6 +926,7 @@ struct AllTasksView: View {
                             ForEach(allTasks) { task in
                                 AllTaskCard(task: task, sessionData: sessionData)
                             }
+                            .onDelete(perform: deleteTasks)
                         }
                         .padding(.horizontal, 16)
                     }
@@ -951,6 +968,13 @@ struct AllTasksView: View {
             NewTaskView(projectId: nil) { task in
                 sessionData.addTask(task)
             }
+        }
+    }
+    
+    private func deleteTasks(at offsets: IndexSet) {
+        for index in offsets {
+            let task = allTasks[index]
+            sessionData.deleteTask(task.id)
         }
     }
 }

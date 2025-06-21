@@ -1,6 +1,90 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Chat Service Protocol (API-Ready)
+
+protocol ChatServiceProtocol {
+    func sendMessage(_ message: String) async throws -> String
+    func generateTaskSuggestions(for message: String, currentTasks: [EmotiTask.Task]) async throws -> [TodoSuggestion]
+}
+
+// MARK: - Dummy Chat Service (for now)
+class DummyChatService: ChatServiceProtocol {
+    func sendMessage(_ message: String) async throws -> String {
+        // Simulate network delay
+        try await _Concurrency.Task.sleep(nanoseconds: 1_500_000_000)
+        
+        let responses = [
+            "I understand how you're feeling. Let's work through this together.",
+            "That sounds like a great opportunity to grow. How can I help you tackle it?",
+            "Your emotions are valid. Would you like to break this down into smaller steps?",
+            "I can sense the energy in your message! What would you like to accomplish today?",
+            "Thank you for sharing that with me. What's the most important thing on your mind right now?",
+            "It sounds like you're processing a lot. Would creating a task list help organize your thoughts?"
+        ]
+        return responses.randomElement() ?? "I'm here to help you navigate through this."
+    }
+    
+    func generateTaskSuggestions(for message: String, currentTasks: [EmotiTask.Task]) async throws -> [TodoSuggestion] {
+        // Simulate network delay
+        try await _Concurrency.Task.sleep(nanoseconds: 1_000_000_000)
+        
+        let lowercaseMessage = message.lowercased()
+        var suggestions: [TodoSuggestion] = []
+        
+        // Analyze emotional context and suggest todo changes
+        if lowercaseMessage.contains("overwhelmed") || lowercaseMessage.contains("stressed") {
+            suggestions.append(TodoSuggestion(
+                message: "I notice you're feeling overwhelmed. Would you like me to reschedule some lower-priority tasks to tomorrow?",
+                actionType: .rescheduleTask(to: Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()),
+                taskId: currentTasks.first { $0.priority == .low }?.id
+            ))
+            
+            suggestions.append(TodoSuggestion(
+                message: "How about adding a 10-minute breathing break to your schedule?",
+                actionType: .addSelfCare,
+                taskId: nil
+            ))
+        }
+        
+        if lowercaseMessage.contains("tired") || lowercaseMessage.contains("exhausted") {
+            suggestions.append(TodoSuggestion(
+                message: "You sound tired. Want me to prioritize your energy-friendly tasks for now?",
+                actionType: .prioritizeTask,
+                taskId: currentTasks.first { $0.emotionalTag == .lowEnergy }?.id
+            ))
+        }
+        
+        if lowercaseMessage.contains("presentation") || lowercaseMessage.contains("deadline") {
+            suggestions.append(TodoSuggestion(
+                message: "I can help you focus on your presentation. Should I move other tasks to give you more time?",
+                actionType: .prioritizeTask,
+                taskId: currentTasks.first { $0.emotionalTag == .focus }?.id
+            ))
+        }
+        
+        return suggestions
+    }
+}
+
+// Note: OpenAI service is now in dedicated OpenAIService.swift file
+
+// MARK: - Todo Suggestion for Chat Integration
+struct TodoSuggestion: Identifiable {
+    let id = UUID()
+    let message: String
+    let actionType: SuggestionActionType
+    let taskId: UUID?
+    
+    enum SuggestionActionType {
+        case rescheduleTask(to: Date)
+        case addBreak
+        case prioritizeTask
+        case addSelfCare
+        case swapTasks
+    }
+}
+
 // MARK: - Onboarding Models
 
 struct OnboardingQuestion: Identifiable {
@@ -97,12 +181,17 @@ struct ChatMessage: Identifiable {
 class ChatSessionData: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var isTyping: Bool = false
+    @Published var isLoading: Bool = false
+    @Published var errorMessage: String?
+    
     let sessionId: String
     let createdAt: Date
+    let chatService: ChatServiceProtocol
     
-    init() {
+    init(chatService: ChatServiceProtocol = DummyChatService()) {
         self.sessionId = UUID().uuidString
         self.createdAt = Date()
+        self.chatService = chatService
     }
     
     func addMessage(_ message: ChatMessage) {
@@ -119,6 +208,46 @@ class ChatSessionData: ObservableObject {
         addMessage(message)
     }
     
+    @MainActor
+    func sendMessage(_ text: String) async {
+        // Add user message immediately
+        addUserMessage(text)
+        
+        // Clear any previous errors
+        errorMessage = nil
+        
+        // Start typing indicator
+        isTyping = true
+        isLoading = true
+        
+        do {
+            // Get AI response
+            let response = try await chatService.sendMessage(text)
+            
+            // Stop typing and add AI response
+            isTyping = false
+            isLoading = false
+            addAIMessage(response)
+            
+        } catch {
+            // Handle error
+            isTyping = false
+            isLoading = false
+            errorMessage = "Sorry, I'm having trouble responding right now. Please try again."
+            addAIMessage("I apologize, but I'm experiencing some technical difficulties. Please try again in a moment.")
+        }
+    }
+    
+    @MainActor
+    func generateSuggestions(for message: String, currentTasks: [EmotiTask.Task]) async -> [TodoSuggestion] {
+        do {
+            return try await chatService.generateTaskSuggestions(for: message, currentTasks: currentTasks)
+        } catch {
+            print("Error generating suggestions: \(error)")
+            return []
+        }
+    }
+    
     func simulateTyping() {
         isTyping = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -132,6 +261,16 @@ class ChatSessionData: ObservableObject {
     
     var messageCount: Int {
         return messages.count
+    }
+}
+
+// MARK: - Extensions
+
+extension Date {
+    var chatTimeString: String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: self)
     }
 }
 
@@ -207,38 +346,7 @@ extension OnboardingData {
 
 extension ChatSessionData {
     static var dummy: ChatSessionData {
-        let session = ChatSessionData()
-        
-        // Add some sample conversation
-        session.addAIMessage("Hello! I'm here to help you manage your tasks while taking care of your emotional well-being. How are you feeling today?")
-        session.addUserMessage("I'm feeling a bit overwhelmed with work. I have so many tasks and don't know where to start.")
-        session.addAIMessage("I understand that feeling of being overwhelmed. It's completely normal when facing a lot of tasks. Let's break this down together. What's the most pressing thing on your mind right now?")
-        session.addUserMessage("I have a big presentation due tomorrow and I haven't even started preparing for it.")
-        session.addAIMessage("That sounds stressful, but we can tackle this step by step. Since you're feeling overwhelmed, I'd suggest breaking the presentation prep into smaller, manageable chunks. Would you like me to help you create a task plan that considers your current emotional state?")
-        
-        return session
-    }
-    
-    static var empty: ChatSessionData {
-        return ChatSessionData()
-    }
-}
-
-// MARK: - Date Extensions
-
-extension Date {
-    var chatTimeString: String {
-        let formatter = DateFormatter()
-        if Calendar.current.isDateInToday(self) {
-            formatter.timeStyle = .short
-            return formatter.string(from: self)
-        } else if Calendar.current.isDateInYesterday(self) {
-            formatter.timeStyle = .short
-            return "Yesterday \(formatter.string(from: self))"
-        } else {
-            formatter.dateStyle = .short
-            formatter.timeStyle = .short
-            return formatter.string(from: self)
-        }
+        // Return a clean session - welcome messages will be added in ChatView.onAppear
+        return ChatSessionData(chatService: ChatServiceManager.shared.createChatService())
     }
 } 

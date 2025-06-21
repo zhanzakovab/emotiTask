@@ -9,7 +9,7 @@ struct MainTabView: View {
             Group {
                 switch selectedTab {
                 case 0:
-                    ProfileView()
+            ProfileView()
                 case 1:
                     ChatView()
                 case 2:
@@ -21,7 +21,7 @@ struct MainTabView: View {
                 }
             }
             .ignoresSafeArea(.all, edges: .bottom)
-            
+                        
             // Custom Floating Tab Bar
             VStack {
                 Spacer()

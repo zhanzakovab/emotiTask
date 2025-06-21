@@ -4,14 +4,14 @@ import SwiftUI
 // MARK: - Emotional Tags
 
 enum EmotionalTag: String, CaseIterable {
-    case lowEnergy = "🧘‍♀️ low energy"
-    case focus = "🔥 focus"
-    case timeSensitive = "⏳ time sensitive"
-    case creative = "🎨 creative"
-    case social = "👥 social"
-    case selfCare = "💚 self care"
-    case routine = "📋 routine"
-    case challenging = "💪 challenging"
+    case lowEnergy = "low energy"
+    case focus = "focus"
+    case timeSensitive = "time sensitive"
+    case creative = "creative"
+    case social = "social"
+    case selfCare = "self care"
+    case routine = "routine"
+    case challenging = "challenging"
     
     var color: Color {
         switch self {
@@ -157,14 +157,14 @@ struct Goal: Identifiable {
 }
 
 enum GoalCategory: String, CaseIterable {
-    case wellness = "🌱 Wellness"
-    case career = "💼 Career"
-    case relationships = "❤️ Relationships"
-    case learning = "📚 Learning"
-    case fitness = "💪 Fitness"
-    case creativity = "🎨 Creativity"
-    case finance = "💰 Finance"
-    case home = "🏠 Home"
+    case wellness = "Wellness"
+    case career = "Career"
+    case relationships = "Relationships"
+    case learning = "Learning"
+    case fitness = "Fitness"
+    case creativity = "Creativity"
+    case finance = "Finance"
+    case home = "Home"
     
     var color: Color {
         switch self {
