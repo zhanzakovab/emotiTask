@@ -1,0 +1,4 @@
+module EmotiTask {
+    header "/Users/botakoz/Desktop/emotiTask/.build/x86_64-apple-macosx/debug/EmotiTask.build/EmotiTask-Swift.h"
+    requires objc
+}

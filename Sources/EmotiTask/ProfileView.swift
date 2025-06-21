@@ -168,7 +168,7 @@ struct ProfileView: View {
                 endPoint: .bottomTrailing
             )
         )
-        .fullScreenCover(isPresented: $showingPersonalityTest) {
+        .sheet(isPresented: $showingPersonalityTest) {
             OnboardingView()
         }
     }

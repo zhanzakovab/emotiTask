@@ -19,14 +19,14 @@ struct OnboardingView: View {
                         Image(systemName: "chevron.left")
                             .font(.title2)
                             .fontWeight(.semibold)
-                            .foregroundColor(.primary)
+                            .foregroundColor(.black)
                     }
                     
                     Spacer()
                     
                     Text("Question \(viewModel.currentQuestionIndex + 1) of \(viewModel.questions.count)")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.gray)
                     
                     Spacer()
                     
@@ -92,16 +92,20 @@ struct OnboardingView: View {
                         if viewModel.currentQuestionIndex == 0 {
                             Text("Allow me to know you better...")
                                 .font(.system(size: 24, weight: .medium, design: .rounded))
-                                .foregroundColor(.primary)
+                                .foregroundColor(.black)
                                 .multilineTextAlignment(.center)
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: false, vertical: true)
                                 .padding(.horizontal, 20)
                         }
                         
                         Text(viewModel.currentQuestion.question)
                             .font(.title3)
                             .fontWeight(.medium)
-                            .foregroundColor(.primary)
+                            .foregroundColor(.black)
                             .multilineTextAlignment(.center)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 20)
                     }
                     
@@ -136,31 +140,43 @@ struct OnboardingView: View {
                         
                         Spacer()
                         
-                        // Question counter
-                        Text("\(viewModel.currentQuestionIndex + 1)/\(viewModel.questions.count)")
-                            .font(.title3)
-                            .fontWeight(.medium)
-                            .foregroundColor(.coral)
+                        // Question counter or Complete button
+                        if viewModel.isLastQuestion {
+                            Text("Complete")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(viewModel.selectedOption != nil ? .coral : .gray.opacity(0.5))
+                        } else {
+                            Text("\(viewModel.currentQuestionIndex + 1)/\(viewModel.questions.count)")
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .foregroundColor(.coral)
+                        }
                         
                         Spacer()
                         
-                        // Next/Complete button
-                        Button(action: {
-                            viewModel.nextQuestion()
-                        }) {
-                            if viewModel.isLastQuestion {
-                                Text("Complete")
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(viewModel.selectedOption != nil ? .coral : .gray.opacity(0.5))
-                            } else {
+                        // Next button (only show if not last question)
+                        if !viewModel.isLastQuestion {
+                            Button(action: {
+                                viewModel.nextQuestion()
+                            }) {
                                 Image(systemName: "arrow.right")
                                     .font(.title3)
                                     .fontWeight(.semibold)
                                     .foregroundColor(viewModel.selectedOption != nil ? .coral : .gray.opacity(0.5))
                             }
+                            .disabled(viewModel.selectedOption == nil)
+                        } else {
+                            // Invisible spacer to keep layout balanced
+                            Button(action: {
+                                viewModel.nextQuestion()
+                            }) {
+                                Image(systemName: "arrow.right")
+                                    .font(.title3)
+                                    .opacity(0)
+                            }
+                            .disabled(viewModel.selectedOption == nil)
                         }
-                        .disabled(viewModel.selectedOption == nil)
                     }
                     .padding(.horizontal, 40)
                     .padding(.vertical, 20)
@@ -194,23 +210,27 @@ struct ModernOptionButton: View {
     
     var body: some View {
         Button(action: action) {
-            HStack {
+            ZStack {
                 Text(title)
                     .font(.body)
                     .fontWeight(.medium)
-                    .foregroundColor(isSelected ? .white : .primary)
-                    .multilineTextAlignment(.leading)
-                
-                Spacer()
+                    .foregroundColor(isSelected ? .white : .black)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity)
                 
                 if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.white)
-                        .font(.title2)
+                    HStack {
+                        Spacer()
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.white)
+                            .font(.title2)
+                    }
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
             .background(
                 RoundedRectangle(cornerRadius: 20)
                     .fill(isSelected ? Color.blue : Color.white.opacity(0.8))
