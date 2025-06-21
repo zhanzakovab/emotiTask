@@ -147,19 +147,19 @@ struct OnboardingView: View {
                                 .fontWeight(.semibold)
                                 .foregroundColor(viewModel.selectedOption != nil ? .coral : .gray.opacity(0.5))
                         } else {
-                            Text("\(viewModel.currentQuestionIndex + 1)/\(viewModel.questions.count)")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.coral)
+                        Text("\(viewModel.currentQuestionIndex + 1)/\(viewModel.questions.count)")
+                            .font(.title3)
+                            .fontWeight(.medium)
+                            .foregroundColor(.coral)
                         }
                         
                         Spacer()
                         
                         // Next button (only show if not last question)
                         if !viewModel.isLastQuestion {
-                            Button(action: {
-                                viewModel.nextQuestion()
-                            }) {
+                        Button(action: {
+                            viewModel.nextQuestion()
+                        }) {
                                 Image(systemName: "arrow.right")
                                     .font(.title3)
                                     .fontWeight(.semibold)
@@ -174,8 +174,8 @@ struct OnboardingView: View {
                                 Image(systemName: "arrow.right")
                                     .font(.title3)
                                     .opacity(0)
-                            }
-                            .disabled(viewModel.selectedOption == nil)
+                        }
+                        .disabled(viewModel.selectedOption == nil)
                         }
                     }
                     .padding(.horizontal, 40)
@@ -223,11 +223,11 @@ struct ModernOptionButton: View {
                 if isSelected {
                     HStack {
                         Spacer()
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.white)
-                            .font(.title2)
-                    }
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.white)
+                        .font(.title2)
                 }
+            }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 18)

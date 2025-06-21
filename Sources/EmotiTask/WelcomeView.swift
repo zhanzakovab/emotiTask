@@ -142,7 +142,7 @@ struct WelcomeView: View {
         .sheet(isPresented: $showingOnboarding) {
             OnboardingView()
         }
-        .fullScreenCover(isPresented: $showingMainApp) {
+        .sheet(isPresented: $showingMainApp) {
             MainTabView()
         }
         .onReceive(NotificationCenter.default.publisher(for: .onboardingCompleted)) { _ in

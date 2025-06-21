@@ -1,23 +1,7 @@
 import SwiftUI
 
-// Todo Suggestion for Chat Integration
-struct TodoSuggestion: Identifiable {
-    let id = UUID()
-    let message: String
-    let actionType: SuggestionActionType
-    let taskId: UUID?
-    
-    enum SuggestionActionType {
-        case rescheduleTask(to: Date)
-        case addBreak
-        case prioritizeTask
-        case addSelfCare
-        case swapTasks
-    }
-}
-
 struct ChatView: View {
-    @StateObject private var chatSession = ChatSessionData.dummy
+    @StateObject private var chatSession = ChatSessionData(chatService: ChatServiceManager.shared.createChatService())
     @StateObject private var toDoSession = ToDoSessionData.createDummyData()
     @State private var newMessage = ""
     @State private var pendingSuggestions: [TodoSuggestion] = []
@@ -26,49 +10,6 @@ struct ChatView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                // Header
-                VStack(spacing: 16) {
-                    // Character
-                    ZStack {
-                        Circle()
-                            .fill(Color.yellow.opacity(0.3))
-                            .frame(width: 60, height: 60)
-                        
-                        // Happy face
-                        VStack(spacing: 4) {
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(Color.black)
-                                    .frame(width: 4, height: 4)
-                                Circle()
-                                    .fill(Color.black)
-                                    .frame(width: 4, height: 4)
-                            }
-                            
-                            Path { path in
-                                path.addArc(center: CGPoint(x: 8, y: 3), 
-                                          radius: 6, 
-                                          startAngle: .degrees(0), 
-                                          endAngle: .degrees(180), 
-                                          clockwise: false)
-                            }
-                            .stroke(Color.black, lineWidth: 1)
-                            .frame(width: 16, height: 8)
-                        }
-                    }
-                    
-                    VStack(spacing: 4) {
-                        Text("EmotiTask Assistant")
-                            .font(.system(size: 18, weight: .semibold, design: .rounded))
-                            .foregroundColor(.primary)
-                        
-                        Text("Your personal productivity companion")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.top, 20)
-                .padding(.bottom, 10)
                 
                 // Messages
                 ScrollViewReader { proxy in
@@ -96,18 +37,41 @@ struct ChatView: View {
                             if chatSession.isTyping {
                                 TypingIndicator()
                             }
+                            
+                            // Show loading indicator
+                            if chatSession.isLoading {
+                                HStack {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("Thinking...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            
+                            // Show error message if any
+                            if let errorMessage = chatSession.errorMessage {
+                                Text(errorMessage)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(Color.red.opacity(0.1))
+                                    .cornerRadius(8)
+                            }
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
                     }
-                    .onChange(of: chatSession.messages.count) {
+                    .onChange(of: chatSession.messages.count) { _, _ in
                         withAnimation(.easeInOut(duration: 0.3)) {
-                            proxy.scrollTo(chatSession.messages.last?.id, anchor: .bottom)
+                            if let lastMessage = chatSession.messages.last {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
                         }
                     }
                 }
-                
-
                 
                 // Input area
                 VStack(spacing: 12) {
@@ -121,6 +85,9 @@ struct ChatView: View {
                                 .font(.body)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
+                                .onSubmit {
+                                    sendMessage()
+                                }
                         }
                         .background(
                             RoundedRectangle(cornerRadius: 20)
@@ -134,7 +101,7 @@ struct ChatView: View {
                                 .font(.title2)
                                 .foregroundColor(newMessage.isEmpty ? .gray.opacity(0.5) : .blue)
                         }
-                        .disabled(newMessage.isEmpty)
+                        .disabled(newMessage.isEmpty || chatSession.isLoading)
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 20)
@@ -152,18 +119,9 @@ struct ChatView: View {
             )
         )
         .onAppear {
-            // Show demo suggestions immediately for testing
-            if showDemoSuggestions {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    chatSession.addAIMessage("I notice you mentioned a presentation earlier. Would you like me to reschedule some less important tasks to give you more focus time?")
-                    pendingSuggestions = [
-                        TodoSuggestion(
-                            message: "I notice you mentioned a presentation. Would you like me to reschedule less important tasks to give you more focus time?",
-                            actionType: .rescheduleTask(to: Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()),
-                            taskId: toDoSession.todayTasks.first { $0.priority == .low }?.id
-                        )
-                    ]
-                }
+            // Generate AI welcome message if this is a new session
+            if chatSession.messages.isEmpty {
+                generateWelcomeMessage()
             }
         }
     }
@@ -171,22 +129,22 @@ struct ChatView: View {
     private func sendMessage() {
         guard !newMessage.isEmpty else { return }
         
-        chatSession.addUserMessage(newMessage)
-        
         let messageToProcess = newMessage
         newMessage = ""
         
         // Clear previous suggestions
         pendingSuggestions = []
         
-        // Simulate AI response
-        chatSession.simulateTyping()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            let aiResponse = generateAIResponse(for: messageToProcess)
-            chatSession.addAIMessage(aiResponse)
+        // Use the new async API-ready method
+        _Concurrency.Task.detached { @MainActor in
+            await chatSession.sendMessage(messageToProcess)
             
-            // Generate contextual todo suggestions and add them as AI messages
-            let suggestions = generateSuggestions(for: messageToProcess)
+            // Generate contextual todo suggestions
+            let suggestions = await chatSession.generateSuggestions(
+                for: messageToProcess, 
+                currentTasks: toDoSession.todayTasks
+            )
+            
             if !suggestions.isEmpty {
                 // Add suggestion as natural AI conversation
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -197,56 +155,6 @@ struct ChatView: View {
         }
     }
     
-    private func generateAIResponse(for message: String) -> String {
-        let responses = [
-            "I understand how you're feeling. Let's work through this together.",
-            "That sounds like a great opportunity to grow. How can I help you tackle it?",
-            "Your emotions are valid. Would you like to break this down into smaller steps?",
-            "I can sense the energy in your message! What would you like to accomplish today?",
-            "Thank you for sharing that with me. What's the most important thing on your mind right now?",
-            "It sounds like you're processing a lot. Would creating a task list help organize your thoughts?"
-        ]
-        return responses.randomElement() ?? "I'm here to help you navigate through this."
-    }
-    
-    private func generateSuggestions(for message: String) -> [TodoSuggestion] {
-        let lowercaseMessage = message.lowercased()
-        var suggestions: [TodoSuggestion] = []
-        
-        // Analyze emotional context and suggest todo changes
-        if lowercaseMessage.contains("overwhelmed") || lowercaseMessage.contains("stressed") {
-            suggestions.append(TodoSuggestion(
-                message: "I notice you're feeling overwhelmed. Would you like me to reschedule some lower-priority tasks to tomorrow?",
-                actionType: .rescheduleTask(to: Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()),
-                taskId: toDoSession.todayTasks.first { $0.priority == .low }?.id
-            ))
-            
-            suggestions.append(TodoSuggestion(
-                message: "How about adding a 10-minute breathing break to your schedule?",
-                actionType: .addSelfCare,
-                taskId: nil
-            ))
-        }
-        
-        if lowercaseMessage.contains("tired") || lowercaseMessage.contains("exhausted") {
-            suggestions.append(TodoSuggestion(
-                message: "You sound tired. Want me to prioritize your energy-friendly tasks for now?",
-                actionType: .prioritizeTask,
-                taskId: toDoSession.todayTasks.first { $0.emotionalTag == .lowEnergy }?.id
-            ))
-        }
-        
-        if lowercaseMessage.contains("presentation") || lowercaseMessage.contains("deadline") {
-            suggestions.append(TodoSuggestion(
-                message: "I can help you focus on your presentation. Should I move other tasks to give you more time?",
-                actionType: .prioritizeTask,
-                taskId: toDoSession.todayTasks.first { $0.emotionalTag == .focus }?.id
-            ))
-        }
-        
-        return suggestions
-    }
-    
     private func applySuggestion(_ suggestion: TodoSuggestion) {
         switch suggestion.actionType {
         case .rescheduleTask(let newDate):
@@ -255,7 +163,7 @@ struct ChatView: View {
                 chatSession.addAIMessage("✅ I've rescheduled that task for you. Focus on what matters most today!")
             }
         case .addSelfCare:
-            let selfCareTask = Task(
+            let selfCareTask = EmotiTask.Task(
                 title: "Take a mindful break",
                 emotionalTag: .selfCare,
                 scheduledDate: Date(),
@@ -266,12 +174,11 @@ struct ChatView: View {
             toDoSession.addTask(selfCareTask)
             chatSession.addAIMessage("✅ I've added a mindful break to your schedule. Your wellbeing matters!")
         case .prioritizeTask:
-            if let taskId = suggestion.taskId {
-                // Logic to prioritize task (could modify priority or move to top)
+            if suggestion.taskId != nil {
                 chatSession.addAIMessage("✅ I've prioritized that task for you. You've got this!")
             }
         case .addBreak:
-            let breakTask = Task(
+            let breakTask = EmotiTask.Task(
                 title: "Short break",
                 emotionalTag: .selfCare,
                 scheduledDate: Date(),
@@ -290,6 +197,37 @@ struct ChatView: View {
     private func dismissSuggestion(_ suggestion: TodoSuggestion) {
         pendingSuggestions.removeAll { $0.id == suggestion.id }
         chatSession.addAIMessage("No problem! I'm here if you change your mind.")
+    }
+    
+    private func generateWelcomeMessage() {
+        // Generate contextual welcome message using GPT
+        _Concurrency.Task.detached { @MainActor in
+            do {
+                // Create a context-aware welcome prompt
+                let currentTime = Date()
+                let timeFormatter = DateFormatter()
+                timeFormatter.timeStyle = .short
+                let timeString = timeFormatter.string(from: currentTime)
+                
+                let welcomePrompt = """
+                This is the very first time the user is opening EmotiTask. Generate a warm, natural welcome message that:
+                1. Introduces yourself as EmotiTask
+                2. Briefly explains what you do (emotionally intelligent task management)
+                3. Asks how they're feeling or what they'd like to work on
+                4. Keep it conversational and welcoming (2-3 sentences max)
+                5. It's currently \(timeString)
+                
+                Make it feel like a natural conversation starter, not a robotic introduction.
+                """
+                
+                let welcomeMessage = try await chatSession.chatService.sendMessage(welcomePrompt)
+                chatSession.addAIMessage(welcomeMessage)
+                
+            } catch {
+                // Fallback to a simple welcome if GPT fails
+                chatSession.addAIMessage("Hello! I'm EmotiTask, your emotionally intelligent assistant. How are you feeling today? 🌟")
+            }
+        }
     }
 }
 
