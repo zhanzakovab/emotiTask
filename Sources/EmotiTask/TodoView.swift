@@ -1,1090 +1,472 @@
 import SwiftUI
 
 struct TodoView: View {
-    @StateObject private var sessionData = ToDoSessionData.createDummyData()
-    @State private var showingNewTask = false
-    @State private var showingNewProject = false
-    @State private var selectedProject: Project?
-    @State private var showingAllTasks = false
+    @StateObject private var taskService = TaskService()
+    @State private var showingAddTask = false
+    @State private var newTaskTitle = ""
+    @State private var selectedEmotionalTag: EmotionalTag = .routine
+    @State private var selectedPriority: TaskPriority = .medium
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Overview Cards Grid
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 12) {
-                        // All Tasks Card
-                        OverviewCard(
-                            title: "All",
-                            count: sessionData.tasks.count,
-                            icon: "tray.fill",
-                            iconColor: .black.opacity(0.6),
-                            action: {
-                                showingAllTasks = true
-                            }
-                        )
-                        
-                        // Completed Tasks Card
-                        OverviewCard(
-                            title: "Completed",
-                            count: sessionData.tasks.filter { $0.isCompleted }.count,
-                            icon: "checkmark.circle.fill",
-                            iconColor: .green,
-                            action: {}
-                        )
-                        
-                        // Today Tasks Card
-                        OverviewCard(
-                            title: "Today",
-                            count: sessionData.todayTasks.count,
-                            icon: "calendar",
-                            iconColor: .blue,
-                            action: {}
-                        )
-                        
-                        // Scheduled Tasks Card
-                        OverviewCard(
-                            title: "Scheduled",
-                            count: sessionData.tasks.filter { !Calendar.current.isDateInToday($0.scheduledDate) }.count,
-                            icon: "calendar.badge.clock",
-                            iconColor: .orange,
-                            action: {}
-                        )
-                    }
-                    .padding(.horizontal, 16)
+                    // Header with connection status
+                    headerSection
                     
-                    // My Projects Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("My Projects")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.black)
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        
-                        // Project Lists
-                        ForEach(sessionData.projects) { project in
-                            ProjectListCard(
-                                project: project,
-                                taskCount: sessionData.tasksForProject(project.id).count,
-                                action: {
-                                    selectedProject = project
-                                }
-                            )
-                        }
-                        .onDelete(perform: deleteProjects)
-                        
-                        // Add Project Button
-                        Button(action: { showingNewProject = true }) {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.black.opacity(0.7))
-                                
-                                Text("Add Project")
-                                    .font(.body)
-                                    .foregroundColor(.black.opacity(0.7))
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                        }
-                    }
+                    // Goals at a Glance
+                    goalsSection
                     
-                    Spacer(minLength: 120) // Space for floating tab bar
+                    // Today's Tasks
+                    todayTasksSection
+                    
+                    // Adaptive Suggestions
+                    adaptiveSuggestionsSection
                 }
-                .padding(.top, 8)
+                .padding()
             }
-            .navigationTitle("Tasks")
+            .navigationTitle("EmotiTask")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button(action: { showingNewTask = true }) {
-                            Label("New Task", systemImage: "plus.circle")
-                        }
-                        
-                        Button(action: { showingNewProject = true }) {
-                            Label("New Project", systemImage: "folder.badge.plus")
-                        }
-                    } label: {
+                    Button(action: { showingAddTask = true }) {
                         Image(systemName: "plus")
-                            .font(.title3)
-                            .foregroundColor(.black.opacity(0.8))
                     }
-            }
-        }
-        .background(
-            LinearGradient(
-                    colors: [
-                        Color(red: 1.0, green: 0.9, blue: 0.8),
-                        Color(red: 1.0, green: 0.8, blue: 0.7)
-                    ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-                .ignoresSafeArea()
-            )
-        }
-        .sheet(isPresented: $showingNewTask) {
-            NewTaskView(projectId: nil) { task in
-                sessionData.addTask(task)
-            }
-        }
-        .sheet(isPresented: $showingNewProject) {
-            NewProjectView { project in
-                sessionData.addProject(project)
-            }
-        }
-        .sheet(item: $selectedProject) { project in
-            ProjectDetailView(project: project, sessionData: sessionData)
-        }
-        .sheet(isPresented: $showingAllTasks) {
-            AllTasksView(sessionData: sessionData)
-        }
-        .onAppear {
-            // Load tasks from backend when view appears
-            _Concurrency.Task {
-                await sessionData.loadTasks()
-            }
-        }
-    }
-    
-    private func deleteProjects(at offsets: IndexSet) {
-        for index in offsets {
-            let project = sessionData.projects[index]
-            sessionData.deleteProject(project.id)
-        }
-    }
-}
-
-// MARK: - Overview Card
-
-struct OverviewCard: View {
-    let title: String
-    let count: Int
-    let icon: String
-    let iconColor: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: icon)
-                        .font(.title2)
-                        .foregroundColor(iconColor)
-                    
-                    Spacer()
-                    
-            Text("\(count)")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
                 }
-            
-            Text(title)
-                    .font(.body)
-                    .foregroundColor(.black.opacity(0.7))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(action: { taskService.loadTasks() }) {
+                        Image(systemName: "arrow.clockwise")
+                            .opacity(taskService.isLoading ? 0.5 : 1.0)
+                    }
+                    .disabled(taskService.isLoading)
+                }
             }
-            .padding(16)
-            .background(Color.white.opacity(0.8))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+            .sheet(isPresented: $showingAddTask) {
+                addTaskSheet
+            }
+            .refreshable {
+                taskService.loadTasks()
+            }
         }
-        .buttonStyle(PlainButtonStyle())
     }
-}
-
-// MARK: - Project List Card
-
-struct ProjectListCard: View {
-    let project: Project
-    let taskCount: Int
-    let action: () -> Void
     
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: project.icon)
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Good morning! 🌅")
                     .font(.title2)
-                    .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
-                    .background(project.color)
-                    .cornerRadius(8)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(project.title)
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundColor(.black)
-                    
-                    if !project.description.isEmpty {
-                        Text(project.description)
-                .font(.caption)
-                            .foregroundColor(.black.opacity(0.6))
-                            .lineLimit(1)
-                    }
-                }
-                
+                    .fontWeight(.semibold)
                 Spacer()
-                
-                Text("\(taskCount)")
-                    .font(.body)
-                .fontWeight(.medium)
-                    .foregroundColor(.black.opacity(0.7))
-                
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.black.opacity(0.5))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.white.opacity(0.8))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
-            .padding(.horizontal, 16)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-// MARK: - Task Card
-
-struct TaskCard: View {
-    let task: Task
-    @ObservedObject var sessionData: ToDoSessionData
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Button(action: {
-                sessionData.completeTask(task.id)
-            }) {
-                Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundColor(task.isCompleted ? .green : .black.opacity(0.4))
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(task.title)
-                    .font(.body)
-                    .foregroundColor(.black)
-                    .strikethrough(task.isCompleted)
-                
-                HStack(spacing: 8) {
-                    if let tag = task.emotionalTag {
-                        Text(tag.rawValue)
-                    .font(.caption)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(tag.color.opacity(0.2))
-                            .cornerRadius(6)
-                            .foregroundColor(.black.opacity(0.7))
-                    }
-                    
-                    Text(task.scheduledDate, formatter: dateTimeFormatter)
-                        .font(.caption)
-                        .foregroundColor(.black.opacity(0.5))
-                    
-                    Spacer()
-                    
-                    Text("\(task.estimatedDuration)min")
-                        .font(.caption)
-                        .foregroundColor(.black.opacity(0.5))
-                }
+                connectionStatusView
             }
             
-            Spacer()
-            
-            // Priority Indicator
-            if task.priority == .high || task.priority == .urgent {
-                Circle()
-                    .fill(task.priority.color)
-                    .frame(width: 8, height: 8)
-            }
-        }
-        .padding(16)
-        .background(Color.white.opacity(0.8))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
-        .padding(.horizontal, 16)
-    }
-    
-    private var dateTimeFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        if Calendar.current.isDateInToday(task.scheduledDate) {
-            formatter.timeStyle = .short
-            formatter.dateStyle = .none
-        } else {
-            formatter.dateStyle = .short
-            formatter.timeStyle = .short
-        }
-        return formatter
-    }
-}
-
-// MARK: - New Project View
-
-struct NewProjectView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var description = ""
-    @State private var selectedColor = Color.blue
-    @State private var selectedIcon = "folder.fill"
-    
-    let onSave: (Project) -> Void
-    
-    let projectColors: [Color] = [.blue, .green, .purple, .orange, .red, .pink, .teal, .indigo]
-    let projectIcons = ["folder.fill", "briefcase.fill", "house.fill", "book.fill", "heart.fill", "star.fill", "flag.fill", "target"]
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Project Name")
-                            .font(.headline)
-                            .foregroundColor(.black)
-                        TextField("Enter project name", text: $title)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Description (Optional)")
-                            .font(.headline)
-                            .foregroundColor(.black)
-                        TextField("Project description", text: $description)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Color")
-                            .font(.headline)
-                            .foregroundColor(.black)
-                        
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
-                            ForEach(projectColors, id: \.self) { color in
-                                Button(action: { selectedColor = color }) {
-                                    Circle()
-                                        .fill(color)
-                                        .frame(width: 40, height: 40)
-                                        .overlay(
-                                            Circle()
-                                                .stroke(Color.black.opacity(0.3), lineWidth: selectedColor == color ? 3 : 0)
-                                        )
-                                }
-                            }
-                        }
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Icon")
-                            .font(.headline)
-                            .foregroundColor(.black)
-                        
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
-                            ForEach(projectIcons, id: \.self) { icon in
-                                Button(action: { selectedIcon = icon }) {
-                                    Image(systemName: icon)
-                                        .font(.title2)
-                                        .foregroundColor(selectedColor)
-                                        .frame(width: 40, height: 40)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(selectedColor.opacity(0.1))
-                                                .stroke(selectedColor.opacity(selectedIcon == icon ? 0.5 : 0), lineWidth: 2)
-                                        )
-                                }
-                            }
-                        }
-                    }
-                    
-                    Spacer(minLength: 40)
-                    
-                    Button("Create Project") {
-                        let newProject = Project(
-                            title: title,
-                            description: description,
-                            color: selectedColor,
-                            icon: selectedIcon
-                        )
-                        onSave(newProject)
-                        dismiss()
-                    }
-                    .disabled(title.isEmpty)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(title.isEmpty ? Color.gray : Color.black.opacity(0.8))
-                    .cornerRadius(28)
-                }
-                .padding(20)
-            }
-            .navigationTitle("New Project")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.black.opacity(0.7))
-                }
-            }
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color(red: 1.0, green: 0.9, blue: 0.8),
-                        Color(red: 1.0, green: 0.8, blue: 0.7)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-            )
-        }
-    }
-}
-
-// MARK: - New Task View
-
-struct NewTaskView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var notes = ""
-    @State private var scheduledDate = Date()
-    @State private var priority: TaskPriority = .medium
-    @State private var emotionalTag: EmotionalTag? = nil
-    @State private var estimatedDuration = 30
-    
-    let projectId: UUID?
-    let onSave: (Task) -> Void
-    
-    init(projectId: UUID? = nil, onSave: @escaping (Task) -> Void) {
-        self.projectId = projectId
-        self.onSave = onSave
-    }
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Task Title")
-                        .font(.headline)
-                            .foregroundColor(.black)
-                        TextField("What needs to be done?", text: $title)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                        Text("Notes (Optional)")
-                        .font(.headline)
-                            .foregroundColor(.black)
-                        TextField("Any additional details...", text: $notes)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                        Text("When")
-                            .font(.headline)
-                            .foregroundColor(.black)
-                        DatePicker("", selection: $scheduledDate, displayedComponents: [.date, .hourAndMinute])
-                            .datePickerStyle(.compact)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Priority")
-                            .font(.headline)
-                            .foregroundColor(.black)
-                        Picker("Priority", selection: $priority) {
-                            ForEach(TaskPriority.allCases, id: \.self) { priority in
-                                Text(priority.rawValue).tag(priority)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Tag (Optional)")
-                        .font(.headline)
-                            .foregroundColor(.black)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                Button("None") {
-                                    emotionalTag = nil
-                                }
-                                .foregroundColor(emotionalTag == nil ? .white : .black.opacity(0.7))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(emotionalTag == nil ? Color.black.opacity(0.7) : Color.white.opacity(0.7))
-                                .cornerRadius(20)
-                                
-                                ForEach(EmotionalTag.allCases, id: \.self) { tag in
-                                    Button(tag.rawValue) {
-                                        emotionalTag = tag
-                                    }
-                                    .foregroundColor(emotionalTag == tag ? .white : .black.opacity(0.7))
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(emotionalTag == tag ? Color.black.opacity(0.7) : Color.white.opacity(0.7))
-                                    .cornerRadius(20)
-                                }
-                            }
-                            .padding(.horizontal, 4)
-                        }
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Estimated Duration")
-                            .font(.headline)
-                            .foregroundColor(.black)
-                        HStack {
-                            Text("\(estimatedDuration) minutes")
-                                .foregroundColor(.black.opacity(0.7))
-                Spacer()
-                            Stepper("", value: $estimatedDuration, in: 5...480, step: 5)
-                        }
-                    }
-                    
-                    Spacer(minLength: 40)
-                
-                    Button("Create Task") {
-                        let newTask = Task(
-                        title: title,
-                            emotionalTag: emotionalTag,
-                            scheduledDate: scheduledDate,
-                            notes: notes,
-                            priority: priority,
-                            estimatedDuration: estimatedDuration,
-                            projectId: projectId
-                    )
-                        
-                        onSave(newTask)
-                        dismiss()
-                    }
-                .disabled(title.isEmpty)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(title.isEmpty ? Color.gray : Color.black.opacity(0.8))
-                    .cornerRadius(28)
-                }
-                .padding(20)
-            }
-            .navigationTitle("New Task")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.black.opacity(0.7))
-                }
-            }
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color(red: 1.0, green: 0.9, blue: 0.8),
-                        Color(red: 1.0, green: 0.8, blue: 0.7)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-            )
-        }
-    }
-}
-
-// MARK: - Project Detail View
-
-struct ProjectDetailView: View {
-    let project: Project
-    @ObservedObject var sessionData: ToDoSessionData
-    @Environment(\.dismiss) private var dismiss
-    @State private var showingNewTask = false
-    
-    var projectTasks: [Task] {
-        sessionData.tasksForProject(project.id)
-            .sorted { task1, task2 in
-                if task1.isCompleted != task2.isCompleted {
-                    return !task1.isCompleted // Incomplete tasks first
-                }
-                return task1.scheduledDate < task2.scheduledDate
-            }
-    }
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Project Header
-                    VStack(spacing: 12) {
-                        HStack {
-                            Image(systemName: project.icon)
-                                .font(.largeTitle)
-                                .foregroundColor(.white)
-                                .frame(width: 60, height: 60)
-                                .background(project.color)
-                                .cornerRadius(16)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(project.title)
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.black)
-                                
-                                if !project.description.isEmpty {
-                                    Text(project.description)
-                                        .font(.body)
-                                        .foregroundColor(.black.opacity(0.7))
-                                }
-                                
-                                Text("\(project.completedTasksCount)/\(project.totalTasksCount) completed")
-                                    .font(.caption)
-                                    .foregroundColor(.black.opacity(0.6))
-                            }
-                            
-                            Spacer()
-                        }
-                        
-                        // Progress Bar
-                        if project.totalTasksCount > 0 {
-                            ProgressView(value: project.progress)
-                                .tint(project.color)
-                                .scaleEffect(y: 2)
-                        }
-                    }
-                    .padding(20)
-                    .background(Color.white.opacity(0.8))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
-                    .padding(.horizontal, 16)
-                    
-                    // Tasks List
-                    if projectTasks.isEmpty {
-                        VStack(spacing: 16) {
-                            Image(systemName: "checklist")
-                                .font(.system(size: 48))
-                                .foregroundColor(.black.opacity(0.3))
-                            
-                            Text("No tasks yet")
-                                .font(.headline)
-                                .foregroundColor(.black.opacity(0.6))
-                            
-                            Text("Add your first task to get started")
-                                .font(.subheadline)
-                                .foregroundColor(.black.opacity(0.5))
-                                .multilineTextAlignment(.center)
-                            
-                            Button("Add Task") {
-                                showingNewTask = true
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(project.color)
-                            .cornerRadius(20)
-                        }
-                        .padding(40)
-                        .background(Color.white.opacity(0.5))
-                        .cornerRadius(16)
-                        .padding(.horizontal, 16)
-                    } else {
-                        LazyVStack(spacing: 8) {
-                            ForEach(projectTasks) { task in
-                                ProjectTaskCard(task: task, sessionData: sessionData, projectColor: project.color)
-                            }
-                            .onDelete(perform: deleteProjectTasks)
-                        }
-                        .padding(.horizontal, 16)
-                    }
-                    
-                    Spacer(minLength: 100)
-                }
-                .padding(.top, 8)
-            }
-            .navigationTitle(project.title)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(.black.opacity(0.7))
-                }
-                
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: { showingNewTask = true }) {
-                        Image(systemName: "plus")
-                            .font(.title3)
-                            .foregroundColor(.black.opacity(0.8))
-                    }
-                }
-            }
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color(red: 1.0, green: 0.9, blue: 0.8),
-                        Color(red: 1.0, green: 0.8, blue: 0.7)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-            )
-        }
-        .sheet(isPresented: $showingNewTask) {
-            NewTaskView(projectId: project.id) { task in
-                sessionData.addTask(task)
-            }
-        }
-    }
-    
-    private func deleteProjectTasks(at offsets: IndexSet) {
-        for index in offsets {
-            let task = projectTasks[index]
-            sessionData.deleteTask(task.id)
-        }
-    }
-}
-
-// MARK: - Project Task Card
-
-struct ProjectTaskCard: View {
-    let task: Task
-    @ObservedObject var sessionData: ToDoSessionData
-    let projectColor: Color
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Button(action: {
-                sessionData.completeTask(task.id)
-            }) {
-                Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundColor(task.isCompleted ? projectColor : .black.opacity(0.4))
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(task.title)
-                    .font(.body)
-                    .foregroundColor(.black)
-                    .strikethrough(task.isCompleted)
-                
-                HStack(spacing: 8) {
-                    if let tag = task.emotionalTag {
-                        Text(tag.rawValue)
-                            .font(.caption)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(tag.color.opacity(0.2))
-                            .cornerRadius(6)
-                            .foregroundColor(.black.opacity(0.7))
-                    }
-                    
-                    Text(task.scheduledDate, formatter: dateTimeFormatter)
-                        .font(.caption)
-                        .foregroundColor(.black.opacity(0.5))
-                    
-                    Spacer()
-                    
-                    Text("\(task.estimatedDuration)min")
-                        .font(.caption)
-                        .foregroundColor(.black.opacity(0.5))
-                }
-                
-                if !task.notes.isEmpty {
-                    Text(task.notes)
-                        .font(.caption)
-                        .foregroundColor(.black.opacity(0.6))
-                        .lineLimit(2)
-                }
-            }
-            
-            Spacer()
-            
-            // Priority Indicator
-            if task.priority == .high || task.priority == .urgent {
-                Circle()
-                    .fill(task.priority.color)
-                    .frame(width: 8, height: 8)
-            }
-        }
-        .padding(16)
-        .background(Color.white.opacity(0.8))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
-    }
-    
-    private var dateTimeFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        if Calendar.current.isDateInToday(task.scheduledDate) {
-            formatter.timeStyle = .short
-            formatter.dateStyle = .none
-        } else {
-            formatter.dateStyle = .short
-            formatter.timeStyle = .short
-        }
-        return formatter
-    }
-}
-
-// MARK: - All Tasks View
-
-struct AllTasksView: View {
-    @ObservedObject var sessionData: ToDoSessionData
-    @Environment(\.dismiss) private var dismiss
-    @State private var showingNewTask = false
-    
-    var allTasks: [Task] {
-        sessionData.tasks
-            .sorted { task1, task2 in
-                if task1.isCompleted != task2.isCompleted {
-                    return !task1.isCompleted // Incomplete tasks first
-                }
-                return task1.scheduledDate < task2.scheduledDate
-            }
-    }
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Summary Header
-                    VStack(spacing: 12) {
-                        HStack {
-                            Image(systemName: "tray.fill")
-                                .font(.largeTitle)
-                                .foregroundColor(.white)
-                                .frame(width: 60, height: 60)
-                                .background(.black.opacity(0.6))
-                                .cornerRadius(16)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("All Tasks")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.black)
-                                
-                                Text("Complete overview of all your tasks")
-                                    .font(.body)
-                                    .foregroundColor(.black.opacity(0.7))
-                                
-                                Text("\(sessionData.tasks.filter { $0.isCompleted }.count)/\(sessionData.tasks.count) completed")
-                                    .font(.caption)
-                                    .foregroundColor(.black.opacity(0.6))
-                            }
-                            
-                            Spacer()
-                        }
-                        
-                        // Progress Bar
-                        if sessionData.tasks.count > 0 {
-                            let progress = Double(sessionData.tasks.filter { $0.isCompleted }.count) / Double(sessionData.tasks.count)
-                            ProgressView(value: progress)
-                                .tint(.black.opacity(0.6))
-                                .scaleEffect(y: 2)
-                        }
-                    }
-                    .padding(20)
-                    .background(Color.white.opacity(0.8))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
-                    .padding(.horizontal, 16)
-                    
-                    // Tasks List
-                    if allTasks.isEmpty {
-                        VStack(spacing: 16) {
-                            Image(systemName: "checklist")
-                                .font(.system(size: 48))
-                                .foregroundColor(.black.opacity(0.3))
-                            
-                            Text("No tasks yet")
-                                .font(.headline)
-                                .foregroundColor(.black.opacity(0.6))
-                            
-                            Text("Create your first task to get started")
-                                .font(.subheadline)
-                                .foregroundColor(.black.opacity(0.5))
-                                .multilineTextAlignment(.center)
-                            
-                            Button("Add Task") {
-                                showingNewTask = true
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(.black.opacity(0.6))
-                            .cornerRadius(20)
-                        }
-                        .padding(40)
-                        .background(Color.white.opacity(0.5))
-                        .cornerRadius(16)
-                        .padding(.horizontal, 16)
-                    } else {
-                        LazyVStack(spacing: 8) {
-                            ForEach(allTasks) { task in
-                                AllTaskCard(task: task, sessionData: sessionData)
-                            }
-                            .onDelete(perform: deleteTasks)
-                        }
-                        .padding(.horizontal, 16)
-                    }
-                    
-                    Spacer(minLength: 100)
-                }
-                .padding(.top, 8)
-            }
-            .navigationTitle("All Tasks")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(.black.opacity(0.7))
-                }
-                
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: { showingNewTask = true }) {
-                        Image(systemName: "plus")
-                            .font(.title3)
-                            .foregroundColor(.black.opacity(0.8))
-                    }
-                }
-            }
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color(red: 1.0, green: 0.9, blue: 0.8),
-                        Color(red: 1.0, green: 0.8, blue: 0.7)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-            )
-        }
-        .sheet(isPresented: $showingNewTask) {
-            NewTaskView(projectId: nil) { task in
-                sessionData.addTask(task)
-            }
-        }
-    }
-    
-    private func deleteTasks(at offsets: IndexSet) {
-        for index in offsets {
-            let task = allTasks[index]
-            sessionData.deleteTask(task.id)
-        }
-    }
-}
-
-// MARK: - All Task Card
-
-struct AllTaskCard: View {
-    let task: Task
-    @ObservedObject var sessionData: ToDoSessionData
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Button(action: {
-                sessionData.completeTask(task.id)
-            }) {
-                Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundColor(task.isCompleted ? .green : .black.opacity(0.4))
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            VStack(alignment: .leading, spacing: 4) {
+            if taskService.isLoading {
                 HStack {
-                    Text(task.title)
-                        .font(.body)
-                        .foregroundColor(.black)
-                        .strikethrough(task.isCompleted)
-                    
-                    Spacer()
-                    
-                    // Project indicator
-                    if let projectId = task.projectId,
-                       let project = sessionData.projects.first(where: { $0.id == projectId }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: project.icon)
-                                .font(.caption)
-                                .foregroundColor(project.color)
-                            Text(project.title)
-                                .font(.caption)
-                                .foregroundColor(.black.opacity(0.6))
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(project.color.opacity(0.1))
-                        .cornerRadius(6)
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading tasks...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else if let error = taskService.error {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Text("You have \(incompleteTasks.count) tasks for today")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color.secondary.opacity(0.1))
+        .cornerRadius(12)
+        .shadow(radius: 2)
+    }
+    
+    private var connectionStatusView: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(TaskServiceConfig.backendEnabled ? .green : .orange)
+                .frame(width: 8, height: 8)
+            Text(TaskServiceConfig.backendEnabled ? "Live" : "Local")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    private var goalsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Goals at a Glance")
+                .font(.headline)
+                .fontWeight(.semibold)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(sampleGoals) { goal in
+                        goalCard(goal)
                     }
                 }
+                .padding(.horizontal)
+            }
+        }
+    }
+    
+    private var todayTasksSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Today's Tasks")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Spacer()
+                Text("\(completedTasks.count)/\(taskService.tasks.count)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            // Mini timeline
+            miniTimeline
+            
+            // Task list
+            LazyVStack(spacing: 8) {
+                ForEach(taskService.tasks) { task in
+                    taskRow(task)
+                }
+            }
+        }
+        .padding()
+        .background(Color.secondary.opacity(0.1))
+        .cornerRadius(12)
+        .shadow(radius: 2)
+    }
+    
+    private var adaptiveSuggestionsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Adaptive Suggestions")
+                .font(.headline)
+                .fontWeight(.semibold)
+            
+            ForEach(adaptiveSuggestions, id: \.title) { suggestion in
+                suggestionCard(suggestion)
+            }
+        }
+    }
+    
+    private var addTaskSheet: some View {
+        NavigationView {
+            Form {
+                Section("Task Details") {
+                    TextField("Task title", text: $newTaskTitle)
+                    
+                    Picker("Emotional Tag", selection: $selectedEmotionalTag) {
+                        ForEach(EmotionalTag.allCases, id: \.self) { tag in
+                            Text(tag.rawValue.capitalized).tag(tag)
+                        }
+                    }
+                    
+                    Picker("Priority", selection: $selectedPriority) {
+                        ForEach(TaskPriority.allCases, id: \.self) { priority in
+                            Text(priority.rawValue).tag(priority)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Add Task")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        showingAddTask = false
+                        resetAddTaskForm()
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add") {
+                        addNewTask()
+                        showingAddTask = false
+                        resetAddTaskForm()
+                    }
+                    .disabled(newTaskTitle.isEmpty)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Helper Views
+    
+    private func goalCard(_ goal: Goal) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(goal.category.rawValue)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("\(Int(goal.progress * 100))%")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+            }
+            
+            Text(goal.title)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .lineLimit(2)
+            
+            ProgressView(value: goal.progress)
+                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+        }
+        .padding()
+        .frame(width: 160)
+        .background(Color.secondary.opacity(0.1))
+        .cornerRadius(12)
+        .shadow(radius: 2)
+    }
+    
+    private var miniTimeline: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                ForEach(Array(taskService.tasks.enumerated()), id: \.element.id) { index, task in
+                    VStack(spacing: 4) {
+                        Circle()
+                            .fill(task.isCompleted ? .green : emotionalTagColor(task.emotionalTag))
+                            .frame(width: 12, height: 12)
+                        
+                        Text(timeString(for: task.scheduledDate, offset: index * 30))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+    
+    private func taskRow(_ task: Task) -> some View {
+        HStack(spacing: 12) {
+            // Completion button
+            Button(action: { taskService.toggleTaskCompletion(task) }) {
+                Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(task.isCompleted ? .green : .gray)
+                    .font(.title3)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(task.title)
+                    .font(.body)
+                    .strikethrough(task.isCompleted)
+                    .foregroundColor(task.isCompleted ? .secondary : .primary)
                 
-                HStack(spacing: 8) {
+                HStack {
                     if let tag = task.emotionalTag {
                         Text(tag.rawValue)
                             .font(.caption)
-                            .padding(.horizontal, 6)
+                            .padding(.horizontal, 8)
                             .padding(.vertical, 2)
-                            .background(tag.color.opacity(0.2))
-                            .cornerRadius(6)
-                            .foregroundColor(.black.opacity(0.7))
+                            .background(emotionalTagColor(tag).opacity(0.2))
+                            .foregroundColor(emotionalTagColor(tag))
+                            .cornerRadius(8)
                     }
                     
-                    Text(task.scheduledDate, formatter: dateTimeFormatter)
+                    Text("\(task.estimatedDuration) min")
                         .font(.caption)
-                        .foregroundColor(.black.opacity(0.5))
+                        .foregroundColor(.secondary)
                     
                     Spacer()
                     
-                    Text("\(task.estimatedDuration)min")
-                        .font(.caption)
-                        .foregroundColor(.black.opacity(0.5))
-                }
-                
-                if !task.notes.isEmpty {
-                    Text(task.notes)
-                        .font(.caption)
-                        .foregroundColor(.black.opacity(0.6))
-                        .lineLimit(2)
+                    priorityIndicator(task.priority)
                 }
             }
             
             Spacer()
             
-            // Priority Indicator
-            if task.priority == .high || task.priority == .urgent {
-                Circle()
-                    .fill(task.priority.color)
-                    .frame(width: 8, height: 8)
+            // Delete button
+            Button(action: { taskService.deleteTask(task) }) {
+                Image(systemName: "trash")
+                    .foregroundColor(.red)
+                    .font(.caption)
             }
         }
-        .padding(16)
-        .background(Color.white.opacity(0.8))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .padding()
+        .background(Color.secondary.opacity(0.1))
+        .cornerRadius(8)
     }
     
-    private var dateTimeFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        if Calendar.current.isDateInToday(task.scheduledDate) {
-            formatter.timeStyle = .short
-            formatter.dateStyle = .none
-        } else {
-            formatter.dateStyle = .short
-            formatter.timeStyle = .short
+    private func suggestionCard(_ suggestion: AdaptiveSuggestion) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: suggestion.icon)
+                .foregroundColor(.blue)
+                .font(.title3)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(suggestion.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                Text(suggestion.description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Button(action: { applySuggestion(suggestion) }) {
+                Text("Apply")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+            }
         }
-        return formatter
+        .padding()
+        .background(Color.secondary.opacity(0.1))
+        .cornerRadius(12)
+        .shadow(radius: 2)
+    }
+    
+    // MARK: - Helper Functions
+    
+    private var incompleteTasks: [Task] {
+        taskService.tasks.filter { !$0.isCompleted }
+    }
+    
+    private var completedTasks: [Task] {
+        taskService.tasks.filter { $0.isCompleted }
+    }
+    
+    private func emotionalTagColor(_ tag: EmotionalTag?) -> Color {
+        guard let tag = tag else { return .gray }
+        switch tag {
+        case .lowEnergy: return .purple
+        case .focus: return .blue
+        case .timeSensitive: return .red
+        case .creative: return .orange
+        case .social: return .green
+        case .selfCare: return .pink
+        case .routine: return .gray
+        case .challenging: return .indigo
+        }
+    }
+    
+    private func priorityIndicator(_ priority: TaskPriority) -> some View {
+        HStack(spacing: 2) {
+            ForEach(0..<priority.level, id: \.self) { _ in
+                Circle()
+                    .fill(priorityColor(priority))
+                    .frame(width: 4, height: 4)
+            }
+        }
+    }
+    
+    private func priorityColor(_ priority: TaskPriority) -> Color {
+        switch priority {
+        case .low: return .green
+        case .medium: return .orange
+        case .high: return .red
+        case .urgent: return .purple
+        }
+    }
+    
+    private func timeString(for date: Date, offset: Int) -> String {
+        let adjustedDate = Calendar.current.date(byAdding: .minute, value: offset, to: date) ?? date
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: adjustedDate)
+    }
+    
+    private func addNewTask() {
+        let newTask = Task(
+            title: newTaskTitle,
+            notes: "",
+            emotionalTag: selectedEmotionalTag,
+            priority: selectedPriority
+        )
+        
+        taskService.addTask(newTask)
+        showingAddTask = false
+        resetAddTaskForm()
+    }
+    
+    private func resetAddTaskForm() {
+        newTaskTitle = ""
+        selectedEmotionalTag = .routine
+        selectedPriority = .medium
+    }
+    
+    private func applySuggestion(_ suggestion: AdaptiveSuggestion) {
+        let newTask = Task(
+            title: suggestion.title,
+            notes: suggestion.description,
+            emotionalTag: .selfCare,
+            priority: .medium
+        )
+        taskService.addTask(newTask)
+    }
+    
+    // MARK: - Sample Data
+    
+    private var sampleGoals: [Goal] {
+        [
+            Goal(
+                title: "Improve Work-Life Balance",
+                description: "Create better boundaries between work and personal time",
+                targetDate: Calendar.current.date(byAdding: .day, value: 30, to: Date()) ?? Date(),
+                progress: 0.4,
+                category: .wellness,
+                relatedTasks: []
+            ),
+            Goal(
+                title: "Learn SwiftUI",
+                description: "Master SwiftUI for iOS development",
+                targetDate: Calendar.current.date(byAdding: .day, value: 60, to: Date()) ?? Date(),
+                progress: 0.7,
+                category: .learning,
+                relatedTasks: []
+            ),
+            Goal(
+                title: "Daily Meditation",
+                description: "Establish a consistent meditation practice",
+                targetDate: Calendar.current.date(byAdding: .day, value: 30, to: Date()) ?? Date(),
+                progress: 0.6,
+                category: .wellness,
+                relatedTasks: []
+            )
+        ]
+    }
+    
+    private var adaptiveSuggestions: [AdaptiveSuggestion] {
+        [
+            AdaptiveSuggestion(
+                title: "Take a mindful break",
+                description: "You've been focused for a while. A 5-minute breathing exercise could help.",
+                icon: "leaf.fill",
+                priority: .medium,
+                emotionalContext: "Based on your focus-heavy tasks"
+            ),
+            AdaptiveSuggestion(
+                title: "Review tomorrow's priorities",
+                description: "End your day by setting intentions for tomorrow.",
+                icon: "calendar",
+                priority: .low,
+                emotionalContext: "Evening routine suggestion"
+            )
+        ]
+    }
+}
+
+// MARK: - Extensions
+
+extension TaskPriority {
+    var level: Int {
+        switch self {
+        case .low: return 1
+        case .medium: return 2
+        case .high: return 3
+        case .urgent: return 4
+        }
     }
 }
 

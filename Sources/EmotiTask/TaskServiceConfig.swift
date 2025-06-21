@@ -3,17 +3,37 @@ import Foundation
 // MARK: - Task Service Configuration
 
 struct TaskServiceConfig {
-    /// Backend API base URL
-    /// Change this to your Python backend URL
-    static let baseURL = "http://0.0.0.0:8000"
+    // Backend Configuration
+    static let backendEnabled = true
+    static let backendURL = "http://localhost:8000"
     
-    /// Enable/disable backend integration
-    /// Set to false to use local-only mode for development
-    static let isBackendEnabled = true
+    // API Endpoints
+    static let baseURL = "\(backendURL)/api/v1"
+    static let tasksEndpoint = "\(baseURL)/tasks"
+    static let projectsEndpoint = "\(baseURL)/projects"
+    static let goalsEndpoint = "\(baseURL)/goals"
+    static let authEndpoint = "\(baseURL)/auth"
+    static let chatEndpoint = "\(baseURL)/chat"
     
-    /// Request timeout in seconds
-    static let requestTimeout: TimeInterval = 30.0
+    // Request Configuration
+    static let timeoutInterval: TimeInterval = 30.0
+    static let retryAttempts = 3
     
-    /// Enable debug logging
-    static let isDebugEnabled = true
+    // Headers
+    static func defaultHeaders(with token: String? = nil) -> [String: String] {
+        var headers = [
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        ]
+        
+        if let token = token {
+            headers["Authorization"] = "Bearer \(token)"
+        }
+        
+        return headers
+    }
+    
+    // Development settings
+    static let debugLogging = true
+    static let mockDataEnabled = !backendEnabled
 } 

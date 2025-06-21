@@ -163,13 +163,12 @@ struct ChatView: View {
                 chatSession.addAIMessage("✅ I've rescheduled that task for you. Focus on what matters most today!")
             }
         case .addSelfCare:
-            let selfCareTask = EmotiTask.Task(
-                title: "Take a mindful break",
+            let selfCareTask = Task(
+                title: "5-minute breathing exercise",
+                notes: "Take a moment to center yourself",
                 emotionalTag: .selfCare,
-                scheduledDate: Date(),
-                notes: "10 minutes of deep breathing or meditation",
                 priority: .medium,
-                estimatedDuration: 10
+                estimatedDuration: 5
             )
             toDoSession.addTask(selfCareTask)
             chatSession.addAIMessage("✅ I've added a mindful break to your schedule. Your wellbeing matters!")
@@ -178,11 +177,12 @@ struct ChatView: View {
                 chatSession.addAIMessage("✅ I've prioritized that task for you. You've got this!")
             }
         case .addBreak:
-            let breakTask = EmotiTask.Task(
-                title: "Short break",
+            let breakTask = Task(
+                title: "Short walk outside",
+                notes: "Get some fresh air and movement",
                 emotionalTag: .selfCare,
-                scheduledDate: Date(),
-                estimatedDuration: 15
+                priority: .low,
+                estimatedDuration: 10
             )
             toDoSession.addTask(breakTask)
             chatSession.addAIMessage("✅ I've scheduled a break for you. Rest is productive too!")
