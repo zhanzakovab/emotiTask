@@ -86,7 +86,7 @@ class OpenAIService: ChatServiceProtocol {
         """
     }
     
-    func generateTaskSuggestions(for message: String, currentTasks: [EmotiTask.Task]) async throws -> [TodoSuggestion] {
+    func generateTaskSuggestions(for message: String, currentTasks: [TodoTask]) async throws -> [TodoSuggestion] {
         // For now, keep task suggestions simple and use dummy service
         // This prevents over-complicating the AI responses
         let dummyService = DummyChatService()

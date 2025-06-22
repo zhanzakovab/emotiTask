@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.config import settings
-from app.routes import auth, tasks, projects, goals, chat
+from app.routes import auth, tasks, projects, goals, chat, mbti
 import uvicorn
 
 # Create FastAPI app
@@ -29,6 +29,7 @@ app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(projects.router, prefix="/api/v1")
 app.include_router(goals.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
+app.include_router(mbti.router, prefix="/api/v1")
 
 # Root endpoint
 @app.get("/")

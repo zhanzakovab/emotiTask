@@ -5,7 +5,7 @@ import SwiftUI
 
 protocol ChatServiceProtocol {
     func sendMessage(_ message: String) async throws -> String
-    func generateTaskSuggestions(for message: String, currentTasks: [Task]) async throws -> [TodoSuggestion]
+    func generateTaskSuggestions(for message: String, currentTasks: [TodoTask]) async throws -> [TodoSuggestion]
 }
 
 // MARK: - Dummy Chat Service (for now)
@@ -25,7 +25,7 @@ class DummyChatService: ChatServiceProtocol {
         return responses.randomElement() ?? "I'm here to help you navigate through this."
     }
     
-    func generateTaskSuggestions(for message: String, currentTasks: [Task]) async throws -> [TodoSuggestion] {
+    func generateTaskSuggestions(for message: String, currentTasks: [TodoTask]) async throws -> [TodoSuggestion] {
         // Simulate network delay
         try await _Concurrency.Task.sleep(nanoseconds: 1_000_000_000)
         
@@ -37,7 +37,7 @@ class DummyChatService: ChatServiceProtocol {
             suggestions.append(TodoSuggestion(
                 message: "I notice you're feeling overwhelmed. Would you like me to reschedule some lower-priority tasks to tomorrow?",
                 actionType: .rescheduleTask(to: Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()),
-                taskId: currentTasks.first { $0.priority == .low }?.id
+                taskId: currentTasks.first(where: { $0.priority == .low })?.id
             ))
             
             suggestions.append(TodoSuggestion(
@@ -51,7 +51,7 @@ class DummyChatService: ChatServiceProtocol {
             suggestions.append(TodoSuggestion(
                 message: "You sound tired. Want me to prioritize your energy-friendly tasks for now?",
                 actionType: .prioritizeTask,
-                taskId: currentTasks.first { $0.emotionalTag == .lowEnergy }?.id
+                taskId: currentTasks.first(where: { $0.emotionalTag == .lowEnergy })?.id
             ))
         }
         
@@ -59,7 +59,7 @@ class DummyChatService: ChatServiceProtocol {
             suggestions.append(TodoSuggestion(
                 message: "I can help you focus on your presentation. Should I move other tasks to give you more time?",
                 actionType: .prioritizeTask,
-                taskId: currentTasks.first { $0.emotionalTag == .focus }?.id
+                taskId: currentTasks.first(where: { $0.emotionalTag == .focus })?.id
             ))
         }
         
@@ -183,6 +183,7 @@ class ChatSessionData: ObservableObject {
     @Published var isTyping: Bool = false
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
+    @Published var isLoadingHistory: Bool = false
     
     let sessionId: String
     let createdAt: Date
@@ -192,6 +193,46 @@ class ChatSessionData: ObservableObject {
         self.sessionId = UUID().uuidString
         self.createdAt = Date()
         self.chatService = chatService
+        
+        // Load chat history if using backend service
+        if chatService is BackendChatService {
+            loadChatHistory()
+        }
+    }
+    
+    private func loadChatHistory() {
+        guard let backendService = chatService as? BackendChatService else { return }
+        
+        isLoadingHistory = true
+        
+        _Concurrency.Task {
+            do {
+                let historyMessages = try await backendService.loadChatHistory()
+                
+                // Convert backend messages to ChatMessage objects
+                let chatMessages = historyMessages.map { backendMessage in
+                    ChatMessage(
+                        text: backendMessage.content,
+                        sender: backendMessage.role == "user" ? .user : .ai,
+                        timestamp: ISO8601DateFormatter().date(from: backendMessage.timestamp) ?? Date()
+                    )
+                }
+                
+                await MainActor.run {
+                    self.messages = chatMessages
+                    self.isLoadingHistory = false
+                }
+                
+                print("✅ Loaded \(chatMessages.count) messages from chat history")
+                
+            } catch {
+                print("⚠️ Failed to load chat history: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.isLoadingHistory = false
+                }
+                // Don't show error to user for history loading - just start fresh
+            }
+        }
     }
     
     func addMessage(_ message: ChatMessage) {
@@ -235,11 +276,12 @@ class ChatSessionData: ObservableObject {
             isLoading = false
             errorMessage = "Sorry, I'm having trouble responding right now. Please try again."
             addAIMessage("I apologize, but I'm experiencing some technical difficulties. Please try again in a moment.")
+            print("❌ Chat error: \(error.localizedDescription)")
         }
     }
     
     @MainActor
-    func generateSuggestions(for message: String, currentTasks: [Task]) async -> [TodoSuggestion] {
+    func generateSuggestions(for message: String, currentTasks: [TodoTask]) async -> [TodoSuggestion] {
         do {
             return try await chatService.generateTaskSuggestions(for: message, currentTasks: currentTasks)
         } catch {

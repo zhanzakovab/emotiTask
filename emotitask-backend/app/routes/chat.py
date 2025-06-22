@@ -1,16 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.models import ChatMessage, ChatResponse
+from app.models import ChatMessage, ChatResponse, ChatRequest, ChatData, ChatHistoryResponse
 from app.auth import get_current_user_id
 from app.database import db
 from app.config import settings
-import openai
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+import json
+import uuid
+from datetime import datetime
+from app.openai_service import OpenAIService
 
 router = APIRouter(prefix="/chat", tags=["chat"])
-
-# Initialize OpenAI client if API key is available
-if settings.OPENAI_API_KEY:
-    openai.api_key = settings.OPENAI_API_KEY
 
 @router.post("/message", response_model=ChatResponse)
 async def send_chat_message(
@@ -56,43 +55,9 @@ async def send_chat_message(
         )
 
 async def generate_openai_response(message: str, context: Dict[str, Any], tasks: List[Dict]) -> str:
-    """Generate response using OpenAI GPT"""
-    try:
-        # Build system prompt
-        system_prompt = f"""
-        You are EmotiTask, an emotionally intelligent task management assistant. 
-        
-        User Profile:
-        - Personality Type: {context['personality_type']}
-        - Active Tasks: {context['active_tasks']}
-        - Completed Today: {context['completed_today']}
-        
-        Your role is to:
-        1. Provide emotional support and encouragement
-        2. Help with task management and productivity
-        3. Adapt your communication style to the user's personality
-        4. Be warm, understanding, and helpful
-        5. Keep responses concise but meaningful
-        
-        Respond naturally and empathetically to the user's message.
-        """
-        
-        # Create chat completion
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": message}
-            ],
-            max_tokens=150,
-            temperature=0.7
-        )
-        
-        return response.choices[0].message.content.strip()
-        
-    except Exception as e:
-        print(f"OpenAI API error: {e}")
-        return generate_dummy_response(message, context)
+    """Generate response using OpenAI GPT - DEPRECATED: Use OpenAI service instead"""
+    # This function is deprecated - the OpenAI service handles responses now
+    return generate_dummy_response(message, context)
 
 def generate_dummy_response(message: str, context: Dict[str, Any]) -> str:
     """Generate a dummy response when OpenAI is not available"""
@@ -208,3 +173,188 @@ async def generate_contextual_suggestions(tasks: List[Dict], personality_type: s
         })
     
     return suggestions 
+
+@router.get("/history/{user_id}", response_model=ChatHistoryResponse)
+async def get_chat_history(user_id: str):
+    """Get chat history for a user."""
+    try:
+        if not db.configured:
+            return ChatHistoryResponse(exists=False)
+        
+        # Get existing chat data for user
+        response = db.client.table("chat_data").select("*").eq("user_id", user_id).execute()
+        
+        if response.data:
+            chat_record = response.data[0]
+            
+            # Parse messages from JSONB
+            messages = []
+            for msg_data in chat_record.get("messages", []):
+                messages.append(ChatMessage(
+                    role=msg_data["role"],
+                    content=msg_data["content"],
+                    timestamp=msg_data["timestamp"]
+                ))
+            
+            chat_data = ChatData(
+                id=chat_record["id"],
+                user_id=chat_record["user_id"],
+                messages=messages,
+                created_at=chat_record["created_at"],
+                updated_at=chat_record["updated_at"]
+            )
+            
+            return ChatHistoryResponse(chat_data=chat_data, exists=True)
+        else:
+            return ChatHistoryResponse(exists=False)
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get chat history: {str(e)}")
+
+@router.post("/send", response_model=ChatResponse)
+async def send_chat_message(request: ChatRequest):
+    """Send a chat message and get AI response."""
+    try:
+        if not db.configured:
+            # Mock response for development
+            mock_response = "I'm here to help! (Development mode - database not configured)"
+            mock_chat_data = ChatData(
+                id=str(uuid.uuid4()),
+                user_id=request.user_id,
+                messages=[
+                    ChatMessage(role="user", content=request.message, timestamp=datetime.now().isoformat()),
+                    ChatMessage(role="assistant", content=mock_response, timestamp=datetime.now().isoformat())
+                ],
+                created_at=datetime.now().isoformat(),
+                updated_at=datetime.now().isoformat()
+            )
+            return ChatResponse(message=mock_response, chat_data=mock_chat_data)
+        
+        # Get or create chat data for user
+        chat_response = db.client.table("chat_data").select("*").eq("user_id", request.user_id).execute()
+        
+        current_messages = []
+        chat_id = None
+        
+        if chat_response.data:
+            # Existing chat found
+            chat_record = chat_response.data[0]
+            chat_id = chat_record["id"]
+            current_messages = chat_record.get("messages", [])
+            print(f"📱 Found existing chat for user {request.user_id} with {len(current_messages)} messages")
+        else:
+            # Create new chat
+            chat_id = str(uuid.uuid4())
+            print(f"🆕 Creating new chat for user {request.user_id}")
+        
+        # Add user message to conversation
+        user_message = {
+            "role": "user",
+            "content": request.message,
+            "timestamp": datetime.now().isoformat()
+        }
+        current_messages.append(user_message)
+        
+        # Get user's personality type for personalized AI response
+        user_persona = await get_user_personality(request.user_id)
+        
+        # Generate AI response using OpenAI
+        openai_service = OpenAIService()
+        ai_response = await openai_service.generate_chat_response(
+            messages=current_messages,
+            user_persona=user_persona
+        )
+        
+        # Add AI response to conversation
+        ai_message = {
+            "role": "assistant", 
+            "content": ai_response,
+            "timestamp": datetime.now().isoformat()
+        }
+        current_messages.append(ai_message)
+        
+        # Save updated chat data to database
+        if chat_response.data:
+            # Update existing chat
+            update_result = db.client.table("chat_data").update({
+                "messages": current_messages,
+                "updated_at": datetime.now().isoformat()
+            }).eq("user_id", request.user_id).execute()
+            
+            if update_result.data:
+                updated_record = update_result.data[0]
+                print(f"✅ Updated chat for user {request.user_id}")
+            else:
+                raise Exception("Failed to update chat data")
+        else:
+            # Create new chat
+            insert_result = db.client.table("chat_data").insert({
+                "id": chat_id,
+                "user_id": request.user_id,
+                "messages": current_messages,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }).execute()
+            
+            if insert_result.data:
+                updated_record = insert_result.data[0]
+                print(f"✅ Created new chat for user {request.user_id}")
+            else:
+                raise Exception("Failed to create chat data")
+        
+        # Convert messages to ChatMessage objects
+        messages_objects = []
+        for msg in current_messages:
+            messages_objects.append(ChatMessage(
+                role=msg["role"],
+                content=msg["content"],
+                timestamp=msg["timestamp"]
+            ))
+        
+        # Return response with updated chat data
+        chat_data = ChatData(
+            id=updated_record["id"],
+            user_id=updated_record["user_id"],
+            messages=messages_objects,
+            created_at=updated_record["created_at"],
+            updated_at=updated_record["updated_at"]
+        )
+        
+        return ChatResponse(message=ai_response, chat_data=chat_data)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send chat message: {str(e)}")
+
+async def get_user_personality(user_id: str) -> Optional[str]:
+    """Get user's personality type for personalized AI responses."""
+    try:
+        if not db.configured:
+            return "INTJ"  # Default for development
+        
+        user_response = db.client.table("user_profiles").select("persona_id").eq("id", user_id).execute()
+        
+        if user_response.data:
+            return user_response.data[0].get("persona_id", "INTJ")
+        else:
+            return "INTJ"  # Default fallback
+            
+    except Exception as e:
+        print(f"⚠️ Failed to get user personality: {e}")
+        return "INTJ"  # Default fallback
+
+@router.delete("/clear/{user_id}")
+async def clear_chat_history(user_id: str):
+    """Clear chat history for a user."""
+    try:
+        if not db.configured:
+            return {"message": "Chat cleared (development mode)"}
+        
+        # Delete chat data for user
+        result = db.client.table("chat_data").delete().eq("user_id", user_id).execute()
+        
+        return {"message": "Chat history cleared successfully"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear chat history: {str(e)}") 

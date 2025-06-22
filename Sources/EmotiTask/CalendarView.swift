@@ -4,7 +4,7 @@ struct CalendarView: View {
     @StateObject private var sessionData = ToDoSessionData.createDummyData()
     @State private var selectedDate = Date()
     @State private var showingTaskDetail = false
-    @State private var selectedTask: Task?
+    @State private var selectedTask: TodoTask?
     
     var body: some View {
         NavigationView {
@@ -88,7 +88,7 @@ struct CalendarView: View {
         }
     }
     
-    private var tasksForSelectedDate: [Task] {
+    private var tasksForSelectedDate: [TodoTask] {
         sessionData.tasksForDate(selectedDate)
             .sorted { task1, task2 in
                 if task1.isCompleted != task2.isCompleted {
@@ -292,7 +292,7 @@ struct CalendarDayView: View {
 }
 
 struct CalendarTaskRow: View {
-    let task: Task
+    let task: TodoTask
     let sessionData: ToDoSessionData
     let onTaskTap: () -> Void
     
@@ -300,7 +300,7 @@ struct CalendarTaskRow: View {
         Button(action: onTaskTap) {
             HStack(spacing: 12) {
                 Button(action: {
-                    sessionData.completeTask(task.id)
+                    sessionData.toggleTaskCompletion(task)
                 }) {
                     Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
                         .font(.title3)
@@ -356,7 +356,7 @@ struct CalendarTaskRow: View {
 }
 
 struct TaskDetailView: View {
-    let task: Task
+    let task: TodoTask
     let sessionData: ToDoSessionData
     @Environment(\.dismiss) private var dismiss
     

@@ -36,7 +36,7 @@ struct TodoView: View {
                     Button(action: { taskService.loadTasks() }) {
                         Image(systemName: "arrow.clockwise")
                             .opacity(taskService.isLoading ? 0.5 : 1.0)
-                    }
+                            }
                     .disabled(taskService.isLoading)
                 }
             }
@@ -72,10 +72,10 @@ struct TodoView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(.orange)
                     Text(error)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
-            }
             
             Text("You have \(incompleteTasks.count) tasks for today")
                 .font(.subheadline)
@@ -103,21 +103,21 @@ struct TodoView: View {
             Text("Goals at a Glance")
                 .font(.headline)
                 .fontWeight(.semibold)
-            
+                
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
                     ForEach(sampleGoals) { goal in
                         goalCard(goal)
+                        }
                     }
-                }
                 .padding(.horizontal)
-            }
+                }
         }
     }
     
     private var todayTasksSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+                    HStack {
                 Text("Today's Tasks")
                     .font(.headline)
                     .fontWeight(.semibold)
@@ -189,9 +189,9 @@ struct TodoView: View {
                         resetAddTaskForm()
                     }
                     .disabled(newTaskTitle.isEmpty)
-                }
-            }
         }
+    }
+}
     }
     
     // MARK: - Helper Views
@@ -204,7 +204,7 @@ struct TodoView: View {
                     .foregroundColor(.secondary)
                 Spacer()
                 Text("\(Int(goal.progress * 100))%")
-                    .font(.caption)
+                .font(.caption)
                     .fontWeight(.semibold)
             }
             
@@ -242,7 +242,7 @@ struct TodoView: View {
         }
     }
     
-    private func taskRow(_ task: Task) -> some View {
+    private func taskRow(_ task: TodoTask) -> some View {
         HStack(spacing: 12) {
             // Completion button
             Button(action: { taskService.toggleTaskCompletion(task) }) {
@@ -329,11 +329,11 @@ struct TodoView: View {
     
     // MARK: - Helper Functions
     
-    private var incompleteTasks: [Task] {
+    private var incompleteTasks: [TodoTask] {
         taskService.tasks.filter { !$0.isCompleted }
     }
     
-    private var completedTasks: [Task] {
+    private var completedTasks: [TodoTask] {
         taskService.tasks.filter { $0.isCompleted }
     }
     
@@ -373,12 +373,12 @@ struct TodoView: View {
     private func timeString(for date: Date, offset: Int) -> String {
         let adjustedDate = Calendar.current.date(byAdding: .minute, value: offset, to: date) ?? date
         let formatter = DateFormatter()
-        formatter.timeStyle = .short
+            formatter.timeStyle = .short
         return formatter.string(from: adjustedDate)
-    }
+        }
     
     private func addNewTask() {
-        let newTask = Task(
+        let newTask = TodoTask(
             title: newTaskTitle,
             notes: "",
             emotionalTag: selectedEmotionalTag,
@@ -397,7 +397,7 @@ struct TodoView: View {
     }
     
     private func applySuggestion(_ suggestion: AdaptiveSuggestion) {
-        let newTask = Task(
+        let newTask = TodoTask(
             title: suggestion.title,
             notes: suggestion.description,
             emotionalTag: .selfCare,

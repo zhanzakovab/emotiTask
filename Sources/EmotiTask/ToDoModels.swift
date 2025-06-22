@@ -36,9 +36,9 @@ struct Project: Identifiable {
     var color: Color
     var icon: String
     var createdDate: Date
-    var tasks: [Task]
+    var tasks: [TodoTask]
     
-    init(title: String, description: String = "", color: Color = .blue, icon: String = "folder.fill", tasks: [Task] = []) {
+    init(title: String, description: String = "", color: Color = .blue, icon: String = "folder.fill", tasks: [TodoTask] = []) {
         self.title = title
         self.description = description
         self.color = color
@@ -97,7 +97,7 @@ enum TaskFilter: String, CaseIterable {
 
 // MARK: - Task Models
 
-struct Task: Identifiable {
+struct TodoTask: Identifiable {
     let id: String
     var title: String
     var isCompleted: Bool
@@ -120,8 +120,8 @@ struct Task: Identifiable {
         self.projectId = projectId
     }
     
-    static func sample() -> Task {
-        return Task(
+    static func sample() -> TodoTask {
+        return TodoTask(
             title: "Sample Task",
             notes: "This is a sample task",
             emotionalTag: .routine,
@@ -226,38 +226,150 @@ enum SuggestionAction {
 // MARK: - To-Do Session Data
 
 class ToDoSessionData: ObservableObject {
-    @Published var tasks: [Task]
-    @Published var projects: [Project]
-    @Published var goals: [Goal]
+    @Published var tasks: [TodoTask] = []
+    @Published var projects: [Project] = []
+    @Published var goals: [Goal] = []
     @Published var currentDate: Date
     @Published var weekDates: [Date]
-    @Published var suggestions: [AdaptiveSuggestion]
-    @Published var userEmotionalState: String // From chat context
+    @Published var suggestions: [AdaptiveSuggestion] = []
+    @Published var userEmotionalState: String = ""
     @Published var selectedViewMode: TaskViewMode = .list
     @Published var selectedFilter: TaskFilter = .all
     @Published var isLoading: Bool = false
     @Published var lastError: String?
     
     private let taskService = TaskService.shared
+    private var userId: String? {
+        // First try to get the user ID from UserDefaults (from MBTI onboarding)
+        if let storedUserId = UserDefaults.standard.string(forKey: "userId"), !storedUserId.isEmpty {
+            return storedUserId
+        }
+        
+        // Fallback to a development user ID that exists in the database
+        return "bc5c3ff4-6011-4c9d-b057-b7989552114d"
+    }
     
     init() {
-        self.tasks = []
-        self.projects = []
-        self.goals = []
         self.currentDate = Date()
         self.weekDates = Self.generateWeekDates(from: Date())
-        self.suggestions = []
-        self.userEmotionalState = "neutral"
+        
+        // Load tasks from backend if user is logged in
+        if userId != nil {
+            Task {
+                await loadTasksFromBackend()
+            }
+        } else {
+            // Use dummy data if no user is logged in
+            loadDummyData()
+        }
+    }
+    
+    // MARK: - Backend Integration
+    
+    @MainActor
+    private func loadTasksFromBackend() async {
+        guard let _ = userId else {
+            print("⚠️ No user ID found - using dummy data")
+            loadDummyData()
+            return
+        }
+        
+        isLoading = true
+        lastError = nil
+        
+        // Use TaskService to load tasks
+        taskService.loadTasks()
+        
+        // Observe TaskService changes
+        tasks = taskService.tasks
+        isLoading = taskService.isLoading
+        lastError = taskService.error
+        
+        print("✅ Loaded \(tasks.count) tasks from backend")
+    }
+    
+    private func loadDummyData() {
+        // Load the existing dummy data for users without accounts
+        let dummySession = ToDoSessionData.createDummyDataInternal()
+        self.tasks = dummySession.tasks
+        self.projects = dummySession.projects
+        self.goals = dummySession.goals
+        self.suggestions = dummySession.suggestions
+        self.userEmotionalState = dummySession.userEmotionalState
+        
+        print("📱 Using dummy data (no user logged in)")
+    }
+    
+    // MARK: - Task Management with Backend Sync
+    
+    func addTask(_ task: TodoTask) {
+        // Add to local array immediately (optimistic update)
+        tasks.append(task)
+        
+        // Sync with backend if user is logged in
+        if userId != nil {
+            taskService.addTask(task)
+            print("✅ Task added and synced to backend: \(task.title)")
+        } else {
+            print("📱 Task added locally only: \(task.title)")
+        }
+        
+        updateGoalProgress(for: task.id)
+    }
+    
+    func updateTask(_ task: TodoTask) {
+        // Update local array immediately (optimistic update)
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            tasks[index] = task
+        }
+        
+        // Sync with backend if user is logged in
+        if userId != nil {
+            taskService.updateTask(task)
+            print("✅ Task updated and synced to backend: \(task.title)")
+        } else {
+            print("📱 Task updated locally only: \(task.title)")
+        }
+        
+        updateGoalProgress(for: task.id)
+    }
+    
+    func deleteTask(_ task: TodoTask) {
+        // Remove from local array immediately (optimistic update)
+        tasks.removeAll { $0.id == task.id }
+        
+        // Sync with backend if user is logged in
+        if userId != nil {
+            taskService.deleteTask(task)
+            print("✅ Task deleted and synced to backend: \(task.title)")
+        } else {
+            print("📱 Task deleted locally only: \(task.title)")
+        }
+        
+        updateGoalProgress(for: task.id)
+    }
+    
+    func toggleTaskCompletion(_ task: TodoTask) {
+        var updatedTask = task
+        updatedTask.isCompleted.toggle()
+        updateTask(updatedTask)
+    }
+    
+    func rescheduleTask(_ taskId: String, to newDate: Date) {
+        if let index = tasks.firstIndex(where: { $0.id == taskId }) {
+            tasks[index].scheduledDate = newDate
+            updateTask(tasks[index])
+        }
     }
     
     // MARK: - Standalone Tasks (not in projects)
-    var standaloneTasks: [Task] {
+    var standaloneTasks: [TodoTask] {
         return tasks.filter { $0.projectId == nil }
     }
     
     // MARK: - Filtered Tasks
-    func filteredTasks(for mode: TaskViewMode, filter: TaskFilter) -> [Task] {
-        var filteredTasks: [Task] = []
+    func filteredTasks(for mode: TaskViewMode, filter: TaskFilter) -> [TodoTask] {
+        var filteredTasks: [TodoTask] = []
         
         // First apply view mode filter
         switch mode {
@@ -297,7 +409,7 @@ class ToDoSessionData: ObservableObject {
         return filteredTasks
     }
     
-    var todayTasks: [Task] {
+    var todayTasks: [TodoTask] {
         let calendar = Calendar.current
         return tasks.filter { calendar.isDate($0.scheduledDate, inSameDayAs: currentDate) }
             .sorted { task1, task2 in
@@ -331,110 +443,18 @@ class ToDoSessionData: ObservableObject {
         projects.removeAll { $0.id == projectId }
     }
     
-    func tasksForProject(_ projectId: UUID) -> [Task] {
+    func tasksForProject(_ projectId: UUID) -> [TodoTask] {
         return tasks.filter { $0.projectId == projectId }
     }
     
-    // MARK: - Task Methods
-    func completeTask(_ taskId: String) {
-        // Update local state immediately for responsive UI
-        if let index = tasks.firstIndex(where: { $0.id == taskId }) {
-            let newCompletionState = !tasks[index].isCompleted
-            tasks[index].isCompleted = newCompletionState
-            updateGoalProgress(for: taskId)
-            
-            // Only sync with backend if enabled
-            guard TaskServiceConfig.backendEnabled else {
-                if TaskServiceConfig.debugLogging {
-                    print("ℹ️ Backend disabled - task completion updated locally only")
-                }
-                return
-            }
-            
-            // Update backend in background - for now just log since we don't have async task service
-            if TaskServiceConfig.debugLogging {
-                print("✅ Task completion would be updated on backend")
-            }
-        }
-    }
-    
-    func rescheduleTask(_ taskId: String, to date: Date) {
-        if let index = tasks.firstIndex(where: { $0.id == taskId }) {
-            tasks[index].scheduledDate = date
-        }
-    }
-    
-    func addTask(_ task: Task) {
-        // Add to local state immediately for responsive UI
-        tasks.append(task)
-        
-        // Only sync with backend if enabled
-        guard TaskServiceConfig.backendEnabled else {
-            if TaskServiceConfig.debugLogging {
-                print("ℹ️ Backend disabled - task added locally only: \(task.title)")
-            }
-            return
-        }
-        
-        isLoading = true
-        lastError = nil
-        
-        // For now just log since we don't have async task service
-        if TaskServiceConfig.debugLogging {
-            print("✅ Task would be created on backend: \(task.title)")
-        }
-        isLoading = false
-    }
-    
-    func deleteTask(_ taskId: String) {
-        // Remove from local state immediately for responsive UI
-        tasks.removeAll { $0.id == taskId }
-        
-        // Only sync with backend if enabled
-        guard TaskServiceConfig.backendEnabled else {
-            if TaskServiceConfig.debugLogging {
-                print("ℹ️ Backend disabled - task deleted locally only")
-            }
-            return
-        }
-        
-        // For now just log since we don't have async task service
-        if TaskServiceConfig.debugLogging {
-            print("✅ Task would be deleted from backend")
-        }
-    }
-    
-    // Load tasks from backend
-    func loadTasks() async {
-        // Only load from backend if enabled
-        guard TaskServiceConfig.backendEnabled else {
-            if TaskServiceConfig.debugLogging {
-                print("ℹ️ Backend disabled - using local tasks only")
-            }
-            return
-        }
-        
-        await MainActor.run {
-            isLoading = true
-            lastError = nil
-        }
-        
-        // For now just log since we don't have async task service
-        await MainActor.run {
-            isLoading = false
-            if TaskServiceConfig.debugLogging {
-                print("✅ Tasks would be loaded from backend")
-            }
-        }
-    }
-    
+    // MARK: - Goal Methods
     private func updateGoalProgress(for taskId: String) {
         for goalIndex in goals.indices {
             let relatedTasksArray = goals[goalIndex].relatedTasks
             if relatedTasksArray.contains(taskId) {
                 let totalTasks = relatedTasksArray.count
                 let completedTasks = relatedTasksArray.filter { relatedTaskId in
-                    tasks.first { $0.id == relatedTaskId }?.isCompleted ?? false
+                    tasks.first(where: { $0.id == relatedTaskId })?.isCompleted ?? false
                 }.count
                 goals[goalIndex].progress = Double(completedTasks) / Double(totalTasks)
             }
@@ -447,7 +467,7 @@ class ToDoSessionData: ObservableObject {
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: startOfWeek) }
     }
     
-    func tasksForDate(_ date: Date) -> [Task] {
+    func tasksForDate(_ date: Date) -> [TodoTask] {
         let calendar = Calendar.current
         return tasks.filter { calendar.isDate($0.scheduledDate, inSameDayAs: date) }
     }
@@ -457,6 +477,10 @@ class ToDoSessionData: ObservableObject {
 
 extension ToDoSessionData {
     static func createDummyData() -> ToDoSessionData {
+        return ToDoSessionData()
+    }
+    
+    private static func createDummyDataInternal() -> ToDoSessionData {
         let session = ToDoSessionData()
         
         // Sample projects
@@ -518,23 +542,23 @@ extension ToDoSessionData {
         
         session.tasks = [
             // Today's tasks - mix of standalone and project tasks
-            Task(title: "Review project proposal", emotionalTag: .focus, scheduledDate: today, priority: .high, estimatedDuration: 60, projectId: workProject.id),
-            Task(title: "10-minute meditation", emotionalTag: .selfCare, scheduledDate: today, priority: .medium, estimatedDuration: 10), // Standalone
-            Task(title: "Call mom", emotionalTag: .social, scheduledDate: today, priority: .medium, estimatedDuration: 30), // Standalone
-            Task(title: "Grocery shopping", emotionalTag: .routine, scheduledDate: today, priority: .low, estimatedDuration: 45), // Standalone
-            Task(title: "Measure kitchen counters", emotionalTag: .routine, scheduledDate: today, priority: .medium, estimatedDuration: 20, projectId: personalProject.id),
+            TodoTask(title: "Review project proposal", emotionalTag: .focus, scheduledDate: today, priority: .high, estimatedDuration: 60, projectId: workProject.id),
+            TodoTask(title: "10-minute meditation", emotionalTag: .selfCare, scheduledDate: today, priority: .medium, estimatedDuration: 10), // Standalone
+            TodoTask(title: "Call mom", emotionalTag: .social, scheduledDate: today, priority: .medium, estimatedDuration: 30), // Standalone
+            TodoTask(title: "Grocery shopping", emotionalTag: .routine, scheduledDate: today, priority: .low, estimatedDuration: 45), // Standalone
+            TodoTask(title: "Measure kitchen counters", emotionalTag: .routine, scheduledDate: today, priority: .medium, estimatedDuration: 20, projectId: personalProject.id),
             
             // Tomorrow's tasks
-            Task(title: "Team meeting", emotionalTag: .social, scheduledDate: tomorrow, priority: .high, estimatedDuration: 90, projectId: workProject.id),
-            Task(title: "SwiftUI tutorial", emotionalTag: .creative, scheduledDate: tomorrow, priority: .medium, estimatedDuration: 120, projectId: learningProject.id),
-            Task(title: "Workout", emotionalTag: .challenging, scheduledDate: tomorrow, priority: .medium, estimatedDuration: 45), // Standalone
-            Task(title: "Research cabinet styles", emotionalTag: .creative, scheduledDate: tomorrow, priority: .low, estimatedDuration: 30, projectId: personalProject.id),
+            TodoTask(title: "Team meeting", emotionalTag: .social, scheduledDate: tomorrow, priority: .high, estimatedDuration: 90, projectId: workProject.id),
+            TodoTask(title: "SwiftUI tutorial", emotionalTag: .creative, scheduledDate: tomorrow, priority: .medium, estimatedDuration: 120, projectId: learningProject.id),
+            TodoTask(title: "Workout", emotionalTag: .challenging, scheduledDate: tomorrow, priority: .medium, estimatedDuration: 45), // Standalone
+            TodoTask(title: "Research cabinet styles", emotionalTag: .creative, scheduledDate: tomorrow, priority: .low, estimatedDuration: 30, projectId: personalProject.id),
             
             // Day after tomorrow
-            Task(title: "Write blog post", emotionalTag: .creative, scheduledDate: dayAfter, priority: .medium, estimatedDuration: 90), // Standalone
-            Task(title: "Doctor appointment", emotionalTag: .timeSensitive, scheduledDate: dayAfter, priority: .high, estimatedDuration: 60), // Standalone
-            Task(title: "Code review session", emotionalTag: .focus, scheduledDate: dayAfter, priority: .high, estimatedDuration: 45, projectId: workProject.id),
-            Task(title: "Build practice app", emotionalTag: .challenging, scheduledDate: dayAfter, priority: .medium, estimatedDuration: 180, projectId: learningProject.id)
+            TodoTask(title: "Write blog post", emotionalTag: .creative, scheduledDate: dayAfter, priority: .medium, estimatedDuration: 90), // Standalone
+            TodoTask(title: "Doctor appointment", emotionalTag: .timeSensitive, scheduledDate: dayAfter, priority: .high, estimatedDuration: 60), // Standalone
+            TodoTask(title: "Code review session", emotionalTag: .focus, scheduledDate: dayAfter, priority: .high, estimatedDuration: 45, projectId: workProject.id),
+            TodoTask(title: "Build practice app", emotionalTag: .challenging, scheduledDate: dayAfter, priority: .medium, estimatedDuration: 180, projectId: learningProject.id)
         ]
         
         // Sample suggestions based on emotional state
@@ -546,7 +570,7 @@ extension ToDoSessionData {
                 priority: .medium,
                 emotionalContext: "feeling drained",
                 suggestedAction: .swap(with: UUID()),
-                taskId: session.tasks.first { $0.emotionalTag == .focus }.flatMap { task in UUID(uuidString: task.id) }
+                taskId: nil
             ),
             AdaptiveSuggestion(
                 title: "Since you're working on work-life balance, how about scheduling some self-care time?",
