@@ -10,11 +10,35 @@ struct ChatView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                
                 // Messages
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 16) {
+                            // Show dummy welcome message if no real messages
+                            if chatSession.messages.isEmpty && !chatSession.isLoadingHistory {
+                                MessageBubbleWithActions(
+                                    message: ChatMessage(
+                                        text: "Hi there! I'm EmotiTask, your personal AI assistant. I'm here to help you manage your tasks while taking care of your emotional well-being. How are you feeling today?",
+                                        sender: .ai
+                                    ),
+                                    showActions: false,
+                                    onTryIt: {},
+                                    onNotNow: {}
+                                )
+                            }
+                            
+                            // Show loading indicator for chat history
+                            if chatSession.isLoadingHistory {
+                                HStack {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("Loading chat history...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 20)
+                            }
+                            
                             ForEach(chatSession.messages, id: \.id) { message in
                                 MessageBubbleWithActions(
                                     message: message, 
@@ -24,7 +48,7 @@ struct ChatView: View {
                                     onTryIt: { 
                                         if let suggestion = pendingSuggestions.first {
                                             applySuggestion(suggestion)
-                                        }
+                            }
                                     },
                                     onNotNow: {
                                         if let suggestion = pendingSuggestions.first {
@@ -108,21 +132,9 @@ struct ChatView: View {
                 }
             }
         }
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color.orange.opacity(0.3),
-                    Color.pink.opacity(0.2)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background(Color.white) // Temporary solid background to make sure it's visible
         .onAppear {
-            // Generate AI welcome message if this is a new session
-            if chatSession.messages.isEmpty {
-                generateWelcomeMessage()
-            }
+            // No need to generate welcome message - using dummy message for UI
         }
     }
     
@@ -163,7 +175,7 @@ struct ChatView: View {
                 chatSession.addAIMessage("✅ I've rescheduled that task for you. Focus on what matters most today!")
             }
         case .addSelfCare:
-            let selfCareTask = Task(
+            let selfCareTask = TodoTask(
                 title: "5-minute breathing exercise",
                 notes: "Take a moment to center yourself",
                 emotionalTag: .selfCare,
@@ -177,7 +189,7 @@ struct ChatView: View {
                 chatSession.addAIMessage("✅ I've prioritized that task for you. You've got this!")
             }
         case .addBreak:
-            let breakTask = Task(
+            let breakTask = TodoTask(
                 title: "Short walk outside",
                 notes: "Get some fresh air and movement",
                 emotionalTag: .selfCare,
@@ -197,37 +209,6 @@ struct ChatView: View {
     private func dismissSuggestion(_ suggestion: TodoSuggestion) {
         pendingSuggestions.removeAll { $0.id == suggestion.id }
         chatSession.addAIMessage("No problem! I'm here if you change your mind.")
-    }
-    
-    private func generateWelcomeMessage() {
-        // Generate contextual welcome message using GPT
-        _Concurrency.Task.detached { @MainActor in
-            do {
-                // Create a context-aware welcome prompt
-                let currentTime = Date()
-                let timeFormatter = DateFormatter()
-                timeFormatter.timeStyle = .short
-                let timeString = timeFormatter.string(from: currentTime)
-                
-                let welcomePrompt = """
-                This is the very first time the user is opening EmotiTask. Generate a warm, natural welcome message that:
-                1. Introduces yourself as EmotiTask
-                2. Briefly explains what you do (emotionally intelligent task management)
-                3. Asks how they're feeling or what they'd like to work on
-                4. Keep it conversational and welcoming (2-3 sentences max)
-                5. It's currently \(timeString)
-                
-                Make it feel like a natural conversation starter, not a robotic introduction.
-                """
-                
-                let welcomeMessage = try await chatSession.chatService.sendMessage(welcomePrompt)
-                chatSession.addAIMessage(welcomeMessage)
-                
-            } catch {
-                // Fallback to a simple welcome if GPT fails
-                chatSession.addAIMessage("Hello! I'm EmotiTask, your emotionally intelligent assistant. How are you feeling today? 🌟")
-            }
-        }
     }
 }
 
@@ -261,17 +242,17 @@ struct MessageBubbleWithActions: View {
             } else {
                 VStack(alignment: .leading, spacing: 4) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(message.text)
-                            .font(.body)
-                            .foregroundColor(.primary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 18)
-                                    .fill(Color.white.opacity(0.9))
-                                    .shadow(color: .gray.opacity(0.2), radius: 2, x: 0, y: 1)
-                            )
-                        
+                    Text(message.text)
+                        .font(.body)
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(Color.white.opacity(0.9))
+                                .shadow(color: .gray.opacity(0.2), radius: 2, x: 0, y: 1)
+                        )
+                    
                         // Action buttons right after the message
                         if showActions {
                             HStack(spacing: 12) {

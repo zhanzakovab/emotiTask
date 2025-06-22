@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Task API Service
 
 class TaskService: ObservableObject {
-    @Published var tasks: [Task] = []
+    @Published var tasks: [TodoTask] = []
     @Published var isLoading = false
     @Published var error: String?
     
@@ -75,7 +75,7 @@ class TaskService: ObservableObject {
                 
                 do {
                     let response = try JSONDecoder().decode(TasksResponse.self, from: data)
-                    self?.tasks = response.tasks.map { self?.convertBackendTask($0) ?? Task.sample() }
+                    self?.tasks = response.tasks.map { self?.convertBackendTask($0) ?? TodoTask.sample() }
                     if TaskServiceConfig.debugLogging {
                         print("✅ Loaded \(response.tasks.count) tasks from backend")
                     }
@@ -87,7 +87,7 @@ class TaskService: ObservableObject {
         }.resume()
     }
     
-    func addTask(_ task: Task) {
+    func addTask(_ task: TodoTask) {
         // Optimistic update
         tasks.append(task)
         
@@ -99,7 +99,7 @@ class TaskService: ObservableObject {
         syncTaskToBackend(task, method: "POST")
     }
     
-    func updateTask(_ task: Task) {
+    func updateTask(_ task: TodoTask) {
         // Optimistic update
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             tasks[index] = task
@@ -113,7 +113,7 @@ class TaskService: ObservableObject {
         syncTaskToBackend(task, method: "PUT")
     }
     
-    func deleteTask(_ task: Task) {
+    func deleteTask(_ task: TodoTask) {
         // Optimistic update
         tasks.removeAll { $0.id == task.id }
         
@@ -125,7 +125,7 @@ class TaskService: ObservableObject {
         deleteTaskFromBackend(task)
     }
     
-    func toggleTaskCompletion(_ task: Task) {
+    func toggleTaskCompletion(_ task: TodoTask) {
         var updatedTask = task
         updatedTask.isCompleted.toggle()
         updateTask(updatedTask)
@@ -133,8 +133,8 @@ class TaskService: ObservableObject {
     
     // MARK: - Backend Sync
     
-    private func syncTaskToBackend(_ task: Task, method: String) {
-        let endpoint = method == "POST" ? TaskServiceConfig.tasksEndpoint : "\(TaskServiceConfig.tasksEndpoint)/\(task.id)"
+    private func syncTaskToBackend(_ task: TodoTask, method: String) {
+        let endpoint = method == "POST" ? TaskServiceConfig.tasksEndpoint : "\(TaskServiceConfig.baseURL)/tasks/\(task.id)"
         
         guard let url = URL(string: endpoint) else {
             if TaskServiceConfig.debugLogging {
@@ -173,8 +173,8 @@ class TaskService: ObservableObject {
         }.resume()
     }
     
-    private func deleteTaskFromBackend(_ task: Task) {
-        let endpoint = "\(TaskServiceConfig.tasksEndpoint)/\(task.id)"
+    private func deleteTaskFromBackend(_ task: TodoTask) {
+        let endpoint = "\(TaskServiceConfig.baseURL)/tasks/\(task.id)"
         
         guard let url = URL(string: endpoint) else {
             if TaskServiceConfig.debugLogging {
@@ -205,7 +205,7 @@ class TaskService: ObservableObject {
     
     // MARK: - Data Conversion
     
-    private func convertToBackendTask(_ task: Task) -> BackendTask {
+    private func convertToBackendTask(_ task: TodoTask) -> BackendTask {
         return BackendTask(
             title: task.title,
             notes: task.notes,
@@ -218,11 +218,11 @@ class TaskService: ObservableObject {
         )
     }
     
-    private func convertBackendTask(_ backendTask: BackendTaskResponse) -> Task {
+    private func convertBackendTask(_ backendTask: BackendTaskResponse) -> TodoTask {
         let dateFormatter = ISO8601DateFormatter()
         let scheduledDate = dateFormatter.date(from: backendTask.scheduled_date) ?? Date()
         
-        return Task(
+        return TodoTask(
             id: backendTask.id,
             title: backendTask.title,
             notes: backendTask.notes,
@@ -238,28 +238,28 @@ class TaskService: ObservableObject {
     
     private func loadMockTasks() {
         tasks = [
-            Task(
+            TodoTask(
                 title: "10-minute meditation",
                 notes: "Daily mindfulness practice",
                 emotionalTag: .selfCare,
                 priority: .medium,
                 estimatedDuration: 10
             ),
-            Task(
+            TodoTask(
                 title: "Review project proposal",
                 notes: "Go through the Q1 launch details",
                 emotionalTag: .focus,
                 priority: .high,
                 estimatedDuration: 60
             ),
-            Task(
+            TodoTask(
                 title: "Call mom",
                 notes: "Weekly check-in call",
                 emotionalTag: .social,
                 priority: .medium,
                 estimatedDuration: 30
             ),
-            Task(
+            TodoTask(
                 title: "Grocery shopping",
                 notes: "Weekly grocery run",
                 emotionalTag: .routine,
@@ -337,3 +337,4 @@ enum TaskServiceError: LocalizedError {
 extension TaskService {
     static let shared = TaskService()
 } 
+ 

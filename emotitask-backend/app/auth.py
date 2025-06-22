@@ -14,8 +14,8 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     # DEVELOPMENT MODE: Allow unauthenticated access when DEBUG is True
     if settings.DEBUG and not credentials:
         print("🔧 Development mode: Using dummy user (no auth required)")
-        return {"id": "12345678-1234-1234-1234-123456789012", "email": "dev@example.com"}
-    
+        return {"id": "bc5c3ff4-6011-4c9d-b057-b7989552114d", "email": "dev@example.com"}
+
     # In development mode without Supabase, return dummy user
     if not db.configured:
         return {"id": "dummy-user-id", "email": "test@example.com"}

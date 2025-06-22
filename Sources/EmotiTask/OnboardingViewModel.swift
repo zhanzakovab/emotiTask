@@ -1,12 +1,8 @@
 import SwiftUI
+import Combine
 
 extension Notification.Name {
     static let onboardingCompleted = Notification.Name("onboardingCompleted")
-}
-
-struct QuestionData {
-    let question: String
-    let options: [String]
 }
 
 class OnboardingViewModel: ObservableObject {
@@ -14,102 +10,20 @@ class OnboardingViewModel: ObservableObject {
     @Published var currentQuestionIndex = 0
     @Published var showingResult = false
     @Published var personalityType = ""
-    @Published var answers: [Int] = []
+    @Published var personalityDescription = ""
+    @Published var answers: [AssessmentAnswer] = []
+    @Published var isLoading = false
+    @Published var error: String?
     
-    let questions = [
-        QuestionData(
-            question: "When faced with a challenging task, I typically:",
-            options: [
-                "Dive in immediately and figure it out as I go",
-                "Plan carefully and research before starting",
-                "Ask for help and collaborate with others"
-            ]
-        ),
-        QuestionData(
-            question: "Which one of the following 4 scenarios best describes your working status?",
-            options: [
-                "I work best in structured environments with clear guidelines",
-                "I thrive in dynamic, fast-paced work situations",
-                "I prefer collaborative team-based projects",
-                "I excel when working independently on creative tasks"
-            ]
-        ),
-        QuestionData(
-            question: "How do you handle stress in difficult situations?",
-            options: [
-                "I stay calm and think through solutions methodically",
-                "I take action immediately to resolve the issue",
-                "I seek support and advice from others",
-                "I take breaks and return with fresh perspective"
-            ]
-        ),
-        QuestionData(
-            question: "What motivates you most in your daily activities?",
-            options: [
-                "Achieving personal goals and milestones",
-                "Learning new skills and gaining knowledge",
-                "Building relationships and helping others",
-                "Creating something unique and meaningful"
-            ]
-        ),
-        QuestionData(
-            question: "How do you prefer to receive feedback?",
-            options: [
-                "Direct and specific with actionable steps",
-                "Constructive with examples and alternatives",
-                "Encouraging with focus on strengths",
-                "Honest and detailed for improvement"
-            ]
-        ),
-        QuestionData(
-            question: "What's your ideal work environment?",
-            options: [
-                "Quiet space with minimal distractions",
-                "Bustling environment with lots of energy",
-                "Collaborative space with team interaction",
-                "Flexible space that changes based on tasks"
-            ]
-        ),
-        QuestionData(
-            question: "How do you approach decision making?",
-            options: [
-                "Analyze all options carefully before deciding",
-                "Trust my instincts and decide quickly",
-                "Discuss with others to get different perspectives",
-                "Consider long-term impact and consequences"
-            ]
-        ),
-        QuestionData(
-            question: "What energizes you most during work?",
-            options: [
-                "Completing tasks efficiently and on time",
-                "Tackling new challenges and problems",
-                "Collaborating and brainstorming with others",
-                "Having creative freedom and flexibility"
-            ]
-        ),
-        QuestionData(
-            question: "How do you handle multiple priorities?",
-            options: [
-                "Create detailed schedules and stick to them",
-                "Focus on the most urgent tasks first",
-                "Delegate and work with team members",
-                "Find creative ways to combine similar tasks"
-            ]
-        ),
-        QuestionData(
-            question: "What describes your communication style?",
-            options: [
-                "Clear, concise, and to the point",
-                "Enthusiastic and expressive",
-                "Warm, supportive, and encouraging",
-                "Thoughtful and detailed"
-            ]
-        )
-    ]
+    private let mbtiService = MBTIService()
     
-    var currentQuestion: QuestionData {
-        questions[currentQuestionIndex]
+    var questions: [MBTIQuestion] {
+        mbtiService.questions
+    }
+    
+    var currentQuestion: MBTIQuestion? {
+        guard !questions.isEmpty && currentQuestionIndex < questions.count else { return nil }
+        return questions[currentQuestionIndex]
     }
     
     var isLastQuestion: Bool {
@@ -120,30 +34,60 @@ class OnboardingViewModel: ObservableObject {
         currentQuestionIndex > 0
     }
     
+    init() {
+        loadQuestions()
+    }
+    
+    func loadQuestions() {
+        isLoading = true
+        mbtiService.loadQuestions()
+        
+        // Observe changes from MBTI service
+        mbtiService.$questions
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] questions in
+                self?.isLoading = false
+                if !questions.isEmpty {
+                    print("✅ Loaded \(questions.count) questions for onboarding")
+                }
+            }
+            .store(in: &cancellables)
+            
+        mbtiService.$error
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] error in
+                self?.error = error
+                self?.isLoading = false
+            }
+            .store(in: &cancellables)
+    }
+    
+    private var cancellables = Set<AnyCancellable>()
+    
     func selectOption(_ index: Int) {
         selectedOption = index
     }
     
     func nextQuestion() {
-        guard let selected = selectedOption else { return }
+        guard let selected = selectedOption,
+              let question = currentQuestion,
+              selected < question.answers.count else { return }
         
-        // Save the answer
+        // Save the answer with proper IDs
+        let answer = AssessmentAnswer(
+            questionId: question.id,
+            answerId: question.answers[selected].id
+        )
+        
         if answers.count > currentQuestionIndex {
-            answers[currentQuestionIndex] = selected
+            answers[currentQuestionIndex] = answer
         } else {
-            answers.append(selected)
+            answers.append(answer)
         }
         
         if isLastQuestion {
-            // Calculate final personality type
-            personalityType = calculatePersonalityType()
-            print("User's personality type: \(personalityType)")
-            print("All answers: \(answers)")
-            
-            // Notify that onboarding is completed
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                NotificationCenter.default.post(name: .onboardingCompleted, object: nil)
-            }
+            // Submit assessment to backend
+            submitAssessment()
         } else {
             // Move to next question
             currentQuestionIndex += 1
@@ -154,76 +98,125 @@ class OnboardingViewModel: ObservableObject {
     func previousQuestion() {
         guard canGoBack else { return }
         currentQuestionIndex -= 1
-        selectedOption = answers.count > currentQuestionIndex ? answers[currentQuestionIndex] : nil
+        selectedOption = answers.count > currentQuestionIndex ? 
+            findAnswerIndex(for: answers[currentQuestionIndex]) : nil
+    }
+    
+    private func findAnswerIndex(for assessmentAnswer: AssessmentAnswer) -> Int? {
+        guard let question = currentQuestion else { return nil }
+        return question.answers.firstIndex { $0.id == assessmentAnswer.answerId }
+    }
+    
+    private func submitAssessment() {
+        isLoading = true
+        
+        // Create user data for new user creation
+        let userData = UserCreationData(email: nil, name: nil) // Can be extended later
+        
+        mbtiService.submitAssessmentAndCreateUser(answers, userData: userData) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.isLoading = false
+                
+                switch result {
+                case .success(let assessmentResult):
+                    self?.personalityType = assessmentResult.personalityType.personaId
+                    self?.personalityDescription = assessmentResult.personalityType.description ?? ""
+                    
+                    print("✅ Assessment completed: \(assessmentResult.personalityType.personaId)")
+                    print("Confidence: \(assessmentResult.confidenceScore)")
+                    
+                    // Store personality results for later use
+                    UserDefaults.standard.set(assessmentResult.personalityType.personaId, forKey: "userPersonalityType")
+                    UserDefaults.standard.set(assessmentResult.personalityType.name, forKey: "userPersonalityName")
+                    UserDefaults.standard.set(assessmentResult.personalityType.description, forKey: "userPersonalityDescription")
+                    
+                    // Store user profile information if created
+                    if let userProfile = assessmentResult.userProfile {
+                        UserDefaults.standard.set(userProfile.id, forKey: "userId")
+                        UserDefaults.standard.set(userProfile.personaId, forKey: "userPersonaId")
+                        print("👤 User profile created: \(userProfile.id) with persona_id: \(userProfile.personaId ?? "nil")")
+                    }
+                    
+                    // Store chat style preferences
+                    UserDefaults.standard.set(assessmentResult.chatStyle.keywords, forKey: "userChatKeywords")
+                    UserDefaults.standard.set(assessmentResult.chatStyle.temperature, forKey: "userChatTemperature")
+                    
+                    // Notify that onboarding is completed
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        NotificationCenter.default.post(name: .onboardingCompleted, object: nil)
+                    }
+                    
+                case .failure(let error):
+                    self?.error = "Assessment failed: \(error.localizedDescription)"
+                    print("❌ Assessment failed: \(error)")
+                    
+                    // Fallback to simple completion without user creation
+                    self?.personalityType = "INTJ"
+                    self?.personalityDescription = "The Architect - Strategic and imaginative, you prefer to work independently and think several steps ahead."
+                    
+                    // Store fallback values
+                    UserDefaults.standard.set("INTJ", forKey: "userPersonalityType")
+                    UserDefaults.standard.set("The Architect", forKey: "userPersonalityName")
+                    UserDefaults.standard.set(self?.personalityDescription, forKey: "userPersonalityDescription")
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        NotificationCenter.default.post(name: .onboardingCompleted, object: nil)
+                    }
+                }
+            }
+        }
     }
     
     func resetQuestionnaire() {
         currentQuestionIndex = 0
         selectedOption = nil
         answers = []
+        personalityType = ""
+        personalityDescription = ""
+        error = nil
     }
     
-    private func calculatePersonalityType() -> String {
-        // Simple scoring system based on answer patterns
-        var scores = [String: Int]()
-        scores["Analyst"] = 0
-        scores["Explorer"] = 0
-        scores["Collaborator"] = 0
-        scores["Creator"] = 0
-        
-        for (questionIndex, answerIndex) in answers.enumerated() {
-            switch questionIndex {
-            case 0: // First question
-                switch answerIndex {
-                case 0: scores["Explorer"]! += 1
-                case 1: scores["Analyst"]! += 1
-                case 2: scores["Collaborator"]! += 1
-                default: break
-                }
-            case 1: // Working status
-                switch answerIndex {
-                case 0: scores["Analyst"]! += 1
-                case 1: scores["Explorer"]! += 1
-                case 2: scores["Collaborator"]! += 1
-                case 3: scores["Creator"]! += 1
-                default: break
-                }
-            default:
-                // For other questions, distribute points based on answer index
-                let types = ["Analyst", "Explorer", "Collaborator", "Creator"]
-                if answerIndex < types.count {
-                    scores[types[answerIndex]]! += 1
-                }
-            }
-        }
-        
-        // Return the personality type with highest score
-        return scores.max(by: { $0.value < $1.value })?.key ?? "Balanced"
-    }
-    
-    private func determinePersonalityType(from selection: Int) -> String {
-        switch selection {
-        case 0:
-            return "Explorer"
-        case 1:
-            return "Analyst"
-        case 2:
-            return "Collaborator"
-        default:
-            return "Balanced"
-        }
-    }
-    
-    // MARK: - Personality Type Descriptions
+    // MARK: - Personality Type Descriptions (Fallback)
     
     func getPersonalityDescription() -> String {
+        if !personalityDescription.isEmpty {
+            return personalityDescription
+        }
+        
+        // Fallback descriptions
         switch personalityType {
-        case "Explorer":
-            return "You're adventurous and prefer to learn through experience. You thrive on spontaneity and enjoy discovering solutions through trial and error."
-        case "Analyst":
-            return "You're methodical and detail-oriented. You prefer to understand the full scope before taking action and value thorough preparation."
-        case "Collaborator":
-            return "You're social and team-oriented. You believe in the power of collective intelligence and enjoy working with others to solve problems."
+        case "INTJ":
+            return "The Architect - Strategic and imaginative, you prefer to work independently and think several steps ahead."
+        case "INTP":
+            return "The Thinker - Innovative and curious, you love exploring new ideas and understanding complex systems."
+        case "ENTJ":
+            return "The Commander - Natural leader who thrives on organizing and directing projects toward success."
+        case "ENTP":
+            return "The Debater - Quick-witted and creative, you excel at generating new possibilities and solutions."
+        case "INFJ":
+            return "The Advocate - Insightful and principled, you work best when your tasks align with your values."
+        case "INFP":
+            return "The Mediator - Creative and idealistic, you prefer flexible environments that honor your personal values."
+        case "ENFJ":
+            return "The Protagonist - Charismatic and inspiring, you excel at motivating others and building consensus."
+        case "ENFP":
+            return "The Campaigner - Enthusiastic and creative, you thrive in dynamic environments with lots of possibilities."
+        case "ISTJ":
+            return "The Logistician - Reliable and methodical, you prefer structured environments with clear expectations."
+        case "ISFJ":
+            return "The Protector - Caring and detail-oriented, you work best in supportive, harmonious environments."
+        case "ESTJ":
+            return "The Executive - Organized and decisive, you excel at managing projects and leading teams efficiently."
+        case "ESFJ":
+            return "The Consul - Warm and cooperative, you thrive in collaborative environments focused on helping others."
+        case "ISTP":
+            return "The Virtuoso - Practical and adaptable, you prefer hands-on work with immediate, tangible results."
+        case "ISFP":
+            return "The Adventurer - Gentle and flexible, you work best in environments that respect your personal space and values."
+        case "ESTP":
+            return "The Entrepreneur - Energetic and pragmatic, you excel in fast-paced, results-oriented environments."
+        case "ESFP":
+            return "The Entertainer - Spontaneous and enthusiastic, you thrive in people-focused, dynamic work situations."
         default:
             return "You have a balanced approach to challenges, adapting your strategy based on the situation."
         }
@@ -233,23 +226,53 @@ class OnboardingViewModel: ObservableObject {
     
     func getTaskRecommendations() -> [String] {
         switch personalityType {
-        case "Explorer":
+        case "INTJ", "INTP":
             return [
-                "Creative projects with flexible deadlines",
-                "Problem-solving tasks that require innovation",
-                "Dynamic environments with changing requirements"
+                "Long-term strategic planning projects",
+                "Complex problem-solving tasks",
+                "Independent research and analysis work"
             ]
-        case "Analyst":
+        case "ENTJ", "ESTJ":
             return [
-                "Data analysis and research projects",
-                "Tasks requiring attention to detail",
-                "Long-term planning and strategy work"
+                "Leadership and project management roles",
+                "Goal-setting and milestone tracking",
+                "Team coordination and resource planning"
             ]
-        case "Collaborator":
+        case "INFJ", "INFP":
             return [
-                "Team-based projects and group activities",
-                "Client-facing roles and communication tasks",
-                "Mentoring and knowledge-sharing opportunities"
+                "Creative projects aligned with personal values",
+                "Meaningful work that helps others",
+                "Flexible deadlines with autonomy"
+            ]
+        case "ENFJ", "ENFP":
+            return [
+                "Collaborative team projects",
+                "Brainstorming and ideation sessions",
+                "People-focused initiatives and communication"
+            ]
+        case "ISTJ", "ISFJ":
+            return [
+                "Structured tasks with clear guidelines",
+                "Detail-oriented work with quality focus",
+                "Consistent routines and organized workflows"
+            ]
+        case "ESFJ", "ESFP":
+            return [
+                "Social and team-oriented projects",
+                "Tasks involving direct people interaction",
+                "Varied work with immediate feedback"
+            ]
+        case "ISTP", "ISFP":
+            return [
+                "Hands-on, practical projects",
+                "Flexible work with minimal supervision",
+                "Tasks allowing for personal expression"
+            ]
+        case "ESTP":
+            return [
+                "Fast-paced, results-driven tasks",
+                "Dynamic environments with variety",
+                "Immediate problem-solving challenges"
             ]
         default:
             return [

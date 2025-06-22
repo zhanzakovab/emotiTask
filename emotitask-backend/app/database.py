@@ -89,7 +89,7 @@ class SupabaseClient:
             return new_task
         
         # For development mode, try to create a user profile if it doesn't exist
-        if settings.DEBUG and user_id == "12345678-1234-1234-1234-123456789012":
+        if settings.DEBUG and user_id == "bc5c3ff4-6011-4c9d-b057-b7989552114d":
             await self._ensure_user_profile_exists(user_id)
         
         self._check_configured()
@@ -127,7 +127,16 @@ class SupabaseClient:
             return user_tasks
         
         try:
-            response = self.client.table("tasks").select("*").eq("user_id", user_id).order("scheduled_date").execute()
+            # In development mode, bypass RLS by using raw SQL
+            if settings.DEBUG:
+                # Use raw SQL to bypass RLS
+                response = self.client.rpc('get_user_tasks', {'p_user_id': user_id}).execute()
+                if response.data is None:
+                    # Fallback to direct query if RPC doesn't exist
+                    response = self.client.table("tasks").select("*").eq("user_id", user_id).order("scheduled_date").execute()
+            else:
+                response = self.client.table("tasks").select("*").eq("user_id", user_id).order("scheduled_date").execute()
+            
             tasks = response.data or []
             print(f"📋 Retrieved {len(tasks)} tasks from Supabase")
             return tasks
@@ -407,5 +416,18 @@ class SupabaseClient:
         response = self.client.table("user_profiles").update(profile_data).eq("id", user_id).execute()
         return response.data[0] if response.data else {}
 
-# Global database instance
-db = SupabaseClient() 
+# Global instance
+db = SupabaseClient()
+
+def get_db_connection():
+    """Get a database connection for direct SQL queries (used by MBTI endpoints)"""
+    if not db.configured:
+        raise Exception("Database not configured - cannot create direct connection")
+    
+    # For Supabase, we'll use the client directly
+    # Note: This is a simplified approach - in production you might want to use psycopg2 directly
+    return db.client
+
+async def get_db():
+    """Dependency to get database client"""
+    return db 

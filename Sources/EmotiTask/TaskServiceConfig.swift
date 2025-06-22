@@ -7,13 +7,13 @@ struct TaskServiceConfig {
     static let backendEnabled = true
     static let backendURL = "http://localhost:8000"
     
-    // API Endpoints
+    // API Endpoints (with trailing slashes for FastAPI)
     static let baseURL = "\(backendURL)/api/v1"
-    static let tasksEndpoint = "\(baseURL)/tasks"
-    static let projectsEndpoint = "\(baseURL)/projects"
-    static let goalsEndpoint = "\(baseURL)/goals"
-    static let authEndpoint = "\(baseURL)/auth"
-    static let chatEndpoint = "\(baseURL)/chat"
+    static let tasksEndpoint = "\(baseURL)/tasks/"
+    static let projectsEndpoint = "\(baseURL)/projects/"
+    static let goalsEndpoint = "\(baseURL)/goals/"
+    static let authEndpoint = "\(baseURL)/auth/"
+    static let chatEndpoint = "\(baseURL)/chat/"
     
     // Request Configuration
     static let timeoutInterval: TimeInterval = 30.0
