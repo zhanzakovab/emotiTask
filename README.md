@@ -1,35 +1,35 @@
-# 🎯 EmotiTask - Emotionally Intelligent Task Management
+# EmotiTask - Emotionally Intelligent Task Management
 
 A SwiftUI iOS app that combines intelligent task management with MBTI personality insights and AI-powered emotional support.
 
-## ✨ Features
+## Features
 
-### 🧠 Personality-Driven Experience
+### Personality-Driven Experience
 - **MBTI Assessment** - 10-question onboarding to determine your personality type
 - **Personalized AI Chat** - Chat assistant adapts responses to your MBTI type
 - **Emotional Task Tagging** - Categorize tasks by emotional context and energy requirements
 - **Adaptive Suggestions** - Task recommendations based on your personality and current mood
 
-### 📋 Smart Task Management
+### Smart Task Management
 - **Intuitive Task Creation** - Quick task entry with emotional tags and priorities
 - **Calendar Integration** - Visual calendar view with task scheduling
 - **Priority Management** - Four-level priority system (Low, Medium, High, Urgent)
 - **Progress Tracking** - Visual progress indicators and completion status
 - **Project Organization** - Group related tasks into projects with goal tracking
 
-### 🤖 AI-Powered Support
+### AI-Powered Support
 - **Emotional Intelligence** - AI recognizes emotional context in conversations
 - **Contextual Suggestions** - Smart recommendations for task adjustments
 - **Stress Management** - Detects overwhelm and suggests breaks or rescheduling
 - **Motivational Support** - Encouraging responses tailored to your personality
 
-### 🎨 Beautiful Interface
+### Beautiful Interface
 - **Modern SwiftUI Design** - Clean, intuitive user interface
 - **Gradient Themes** - Warm, calming color schemes
 - **Smooth Animations** - Polished transitions and interactions
 - **Accessibility** - VoiceOver support and accessibility features
 
-## 🏗️ Architecture
+## Architecture
 
 ### Frontend (SwiftUI)
 ```
@@ -72,7 +72,7 @@ emotitask-backend/
 └── run.py                       # Server entry point
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - **iOS Development**: Xcode 15.0+, iOS 15.0+
@@ -123,7 +123,7 @@ Open the project in Xcode and run, or use Swift Package Manager:
 swift build
 ```
 
-## 🗄️ Database Schema
+## Database Schema
 
 ### Core Tables
 
@@ -148,7 +148,7 @@ swift build
 - **Automatic Timestamps** - Tracks creation and updates
 - **UUID Primary Keys** - Globally unique identifiers
 
-## 🧠 MBTI Integration
+## MBTI Integration
 
 ### Assessment Process
 1. **10 Scenario Questions** - Fun, relatable situations
@@ -169,7 +169,7 @@ Each personality type has unique:
 - **AI Temperature** - Creativity vs consistency balance
 - **Task Recommendations** - Aligned with personality strengths
 
-## 🤖 AI Features
+## AI Features
 
 ### Chat Assistant Capabilities
 - **Emotional Support** - Recognizes stress, overwhelm, excitement
@@ -183,7 +183,7 @@ Each personality type has unique:
 - **High Stress** → Proposes breathing exercises
 - **Deadline Pressure** → Helps prioritize critical tasks
 
-## 📊 Data Models
+## Data Models
 
 ### Core Models
 ```swift
@@ -232,7 +232,7 @@ struct PersonalityType: Codable {
 }
 ```
 
-## 🎨 UI/UX Design
+## UI/UX Design
 
 ### Design Principles
 - **Emotional Warmth** - Soft gradients and calming colors
@@ -246,7 +246,7 @@ struct PersonalityType: Codable {
 - **Priority Levels** - Visual hierarchy with distinct colors
 - **Chat Interface** - Bubble design with personality-based styling
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 ```bash
@@ -266,7 +266,7 @@ struct TaskServiceConfig {
 }
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Backend API Testing
 ```bash
@@ -290,7 +290,7 @@ python test_task_integration.py
 - [ ] Check data persistence
 - [ ] Test offline functionality
 
-## 📱 Platform Support
+## Platform Support
 
 ### iOS Requirements
 - **iOS 15.0+** - SwiftUI 3.0 features
@@ -304,7 +304,7 @@ python test_task_integration.py
 - **Database** - Supabase PostgreSQL (managed)
 - **AI Services** - OpenAI API integration
 
-## 🚀 Deployment
+## Deployment
 
 ### iOS App Store
 1. **Archive in Xcode** - Create release build
@@ -321,7 +321,7 @@ railway add postgresql
 railway deploy
 ```
 
-## 📈 Future Roadmap
+## Future Roadmap
 
 ### Planned Features
 - **Team Collaboration** - Shared projects and tasks
@@ -338,7 +338,7 @@ railway deploy
 - **Localization** - Multi-language support
 - **Accessibility** - Enhanced VoiceOver and assistive technology support
 
-## 🤝 Contributing
+## Contributing
 
 ### Development Guidelines
 1. **Fork** the repository
@@ -355,11 +355,11 @@ railway deploy
 - **Async/Await** - Modern concurrency patterns
 - **Documentation** - Comprehensive inline documentation
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **OpenAI** - GPT integration for intelligent conversations
 - **Supabase** - Backend-as-a-Service platform and database
@@ -367,7 +367,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **MBTI Foundation** - Personality type system and assessment methodology
 - **Design Inspiration** - Modern productivity and wellness apps
 
-## 📞 Support
+## Support
 
 - **GitHub Issues** - Bug reports and feature requests
 - **Discussions** - Community questions and ideas
